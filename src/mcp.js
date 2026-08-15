@@ -124,10 +124,17 @@ export async function handleMcp(request, ctx) {
   }
 
   const { id, method } = msg;
-  const isRequest = id !== undefined && id !== null;
 
-  // Notifications and client responses get 202 with no body.
-  if (!isRequest) {
+  // Per the transport spec, only JSON-RPC *requests* get a response body.
+  // Notifications carry no id; client responses carry an id but no method and
+  // instead a result/error. Both are acknowledged with a bare 202.
+  const isNotification = id === undefined || id === null;
+  const isClientResponse =
+    !isNotification &&
+    method === undefined &&
+    (Object.hasOwn(msg, "result") || Object.hasOwn(msg, "error"));
+
+  if (isNotification || isClientResponse) {
     return new Response(null, { status: 202, headers: cors });
   }
 
@@ -186,7 +193,13 @@ function corsHeaders(origin) {
   return h;
 }
 
+// Reject on the declared length before reading, so an oversized body is never
+// pulled into memory, then enforce again on the actual bytes in case
+// Content-Length was absent or lied.
 async function readLimitedText(request, limit) {
+  const declared = Number(request.headers.get("content-length"));
+  if (Number.isFinite(declared) && declared > limit) throw new Error("too large");
+
   const buf = await request.arrayBuffer();
   if (buf.byteLength > limit) throw new Error("too large");
   return new TextDecoder().decode(buf);
@@ -433,9 +446,13 @@ async function toolCompanyFinancials(args, ctx) {
     404: `no ${concept} data reported for this company`,
   });
 
+  // A concept can be reported in several units (EPS carries USD/shares
+  // alongside USD). Prefer plain USD so the common case is unsurprising, and
+  // always state which unit the numbers are in.
   const units = data?.units && typeof data.units === "object" ? data.units : {};
-  const unit = Object.keys(units)[0];
-  const series = unit && Array.isArray(units[unit]) ? units[unit] : [];
+  const unitNames = Object.keys(units).filter((u) => Array.isArray(units[u]));
+  const unit = unitNames.includes("USD") ? "USD" : unitNames[0];
+  const series = unit ? units[unit] : [];
 
   const points = series.slice(-MAX_DATA_POINTS).map((p) => ({
     value: typeof p?.val === "number" ? p.val : null,
@@ -454,6 +471,7 @@ async function toolCompanyFinancials(args, ctx) {
     company: clean(data?.entityName),
     concept,
     unit: unit || null,
+    availableUnits: unitNames,
     returned: points.length,
     note: "As-reported values. Not restated or adjusted; cite accessionNumber and filed date.",
     points,
