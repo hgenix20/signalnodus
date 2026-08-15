@@ -17,5 +17,21 @@
     "TURNSTILE_SITEKEY": "0x4AAAAAAEQZL0HWxzKNdU1w",
     "CONTACT_EMAIL": "hgenix@agentmail.to"
   },
+  // The MCP endpoint is unauthenticated and every miss becomes one request
+  // against SEC, who rate limit at 10 req/s and block by User-Agent. This caps
+  // what a single caller can turn into upstream load.
+  "unsafe": {
+    "bindings": [
+      {
+        "name": "MCP_RATE_LIMITER",
+        "type": "ratelimit",
+        "namespace_id": "1001",
+        "simple": { "limit": 60, "period": 60 }
+      }
+    ]
+  },
+  // A single request should never need more than a fraction of a second; this
+  // stops a pathological upstream document from burning (billable) CPU.
+  "limits": { "cpu_ms": 200 },
   "observability": { "enabled": true }
 }
