@@ -1,0 +1,21 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "signalnodus",
+  "main": "src/index.js",
+  "compatibility_date": "2026-07-01",
+  "account_id": "984eb5b5299c2820223838b1456a1733",
+  "routes": [
+    { "pattern": "signalnodus.ai", "custom_domain": true },
+    { "pattern": "www.signalnodus.ai", "custom_domain": true },
+    { "pattern": "api.signalnodus.ai", "custom_domain": true },
+    { "pattern": "mcp.signalnodus.ai", "custom_domain": true },
+    { "pattern": "app.signalnodus.ai", "custom_domain": true },
+    { "pattern": "staging.signalnodus.ai", "custom_domain": true },
+    { "pattern": "dev.signalnodus.ai", "custom_domain": true }
+  ],
+  "vars": {
+    "TURNSTILE_SITEKEY": "0x4AAAAAAEQZL0HWxzKNdU1w",
+    "CONTACT_EMAIL": "hgenix@agentmail.to"
+  },
+  "observability": { "enabled": true }
+}
