@@ -20,6 +20,13 @@
   // The MCP endpoint is unauthenticated and every miss becomes one request
   // against SEC, who rate limit at 10 req/s and block by User-Agent. This caps
   // what a single caller can turn into upstream load.
+  "d1_databases": [
+    {
+      "binding": "BILLING",
+      "database_name": "signalnodus-billing",
+      "database_id": "8d464cfd-9ac3-4eb1-b6cf-e1531458e650"
+    }
+  ],
   "unsafe": {
     "bindings": [
       {
@@ -32,6 +39,6 @@
   },
   // A single request should never need more than a fraction of a second; this
   // stops a pathological upstream document from burning (billable) CPU.
-  "limits": { "cpu_ms": 200 },
+  "limits": { "cpu_ms": 30000 },
   "observability": { "enabled": true }
 }

@@ -6,8 +6,11 @@
 //
 // Spec: https://modelcontextprotocol.io/specification/2025-06-18
 
+import { htmlToText, extractItem, diffSections, itemCatalog, knownItem } from "./filings.js";
+import { authorize, paymentRequired, priceOf, dollars, FREE_DAILY_BILLABLE } from "./billing.js";
+
 const SERVER_NAME = "signalnodus";
-const SERVER_VERSION = "0.2.0";
+const SERVER_VERSION = "0.3.0";
 
 const LATEST_PROTOCOL = "2025-06-18";
 const SUPPORTED_PROTOCOLS = new Set(["2025-06-18", "2025-03-26", "2024-11-05"]);
@@ -18,6 +21,9 @@ const SEC_USER_AGENT = "SignalNodus/0.2 (hgenix@agentmail.to)";
 const MAX_BODY_BYTES = 64 * 1024;
 const MAX_UPSTREAM_BYTES = 8 * 1024 * 1024; // EDGAR submissions for prolific filers run large
 const MAX_TICKER_MAP_BYTES = 4 * 1024 * 1024;
+// Whole filing documents are far bigger than the JSON endpoints: a large
+// 10-K with inline XBRL runs well past 8MB.
+const MAX_FILING_BYTES = 32 * 1024 * 1024;
 const UPSTREAM_TIMEOUT_MS = 10_000;
 
 const SUBMISSIONS_TTL = 900; // 15 min; filings post throughout the day
@@ -163,7 +169,7 @@ export async function handleMcp(request, env, ctx) {
   }
 
   try {
-    const result = await dispatch(method, msg.params ?? {}, env, ctx);
+    const result = await dispatch(method, msg.params ?? {}, env, ctx, request);
     return jsonRpc({ jsonrpc: "2.0", id, result }, cors);
   } catch (err) {
     if (err instanceof RpcError) {
@@ -191,6 +197,18 @@ async function withinRateLimit(request, env) {
     console.error("rate limiter unavailable", err);
     return true;
   }
+}
+
+
+// The API key travels in Authorization: Bearer, or X-API-Key for clients that
+// cannot set Authorization.
+function extractApiKey(request) {
+  if (!request?.headers) return null;
+  const auth = request.headers.get("authorization") || "";
+  const m = /^Bearer\s+(.+)$/i.exec(auth.trim());
+  if (m) return m[1].trim();
+  const x = request.headers.get("x-api-key");
+  return x ? x.trim() : null;
 }
 
 class RpcError extends Error {
@@ -278,16 +296,28 @@ function rpcErrorResponse(id, code, message, cors, status) {
 
 // ------------------------------------------------------------ MCP dispatch
 
-async function dispatch(method, params, env, ctx) {
+async function dispatch(method, params, env, ctx, request) {
   switch (method) {
     case "initialize":
       return initialize(params);
     case "ping":
       return {};
     case "tools/list":
-      return { tools: TOOLS };
+      return {
+        tools: TOOLS.map((t) => {
+          const price = priceOf(t.name);
+          return {
+            ...t,
+            description:
+              t.description +
+              (price === 0
+                ? " Free, no key required."
+                : ` Costs ${dollars(price)} per call. First ${FREE_DAILY_BILLABLE} billable calls each day are free with no signup.`),
+          };
+        }),
+      };
     case "tools/call":
-      return callTool(params, env, ctx);
+      return callTool(params, env, ctx, request);
     default:
       throw new RpcError(JSON_RPC.METHOD_NOT_FOUND, `unknown method: ${method}`);
   }
@@ -390,9 +420,58 @@ const TOOLS = [
     },
     annotations: { readOnlyHint: true, openWorldHint: true },
   },
+  {
+    name: "filing_section",
+    title: "Extract one section of a filing",
+    description:
+      "Pull a single numbered item out of a 10-K or 10-Q as clean text: risk factors (1A), " +
+      "MD&A (7), business (1), and the rest. Saves you fetching a multi-megabyte HTML " +
+      "document and finding the section yourself. Pin an exact filing with `accession`; " +
+      "without it you get the most recent filing of that form, which changes when the " +
+      "company amends.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        company: COMPANY_PROP,
+        item: { type: "string", description: "Item number, e.g. 1A, 7, 7A. Call with item omitted to list what this filing has." },
+        form: { type: "string", description: "10-K or 10-Q. Default 10-K." },
+        accession: {
+          type: "string",
+          description: "Exact accession number to pin, e.g. 0000320193-26-000020. Strongly recommended for anything reproducible.",
+        },
+        max_chars: { type: "integer", minimum: 1000, maximum: 200000, description: "Truncate the section. Default 50000." },
+      },
+      required: ["company"],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: true, openWorldHint: true },
+  },
+  {
+    name: "compare_filings",
+    title: "Diff a section across two filings",
+    description:
+      "Compare the same item between two filings of a company and return what changed: " +
+      "added and removed passages plus a change ratio. This is the year-over-year risk " +
+      "factor or MD&A comparison, done for you. Pass two accession numbers to pin exactly " +
+      "which filings are compared; otherwise the two most recent of that form are used.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        company: COMPANY_PROP,
+        item: { type: "string", description: "Item to compare, e.g. 1A for risk factors. Default 1A." },
+        form: { type: "string", description: "10-K or 10-Q. Default 10-K." },
+        from_accession: { type: "string", description: "Older filing to compare from." },
+        to_accession: { type: "string", description: "Newer filing to compare to." },
+        max_passages: { type: "integer", minimum: 5, maximum: 200, description: "Cap on added/removed passages returned. Default 40." },
+      },
+      required: ["company"],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: true, openWorldHint: true },
+  },
 ];
 
-async function callTool(params, env, ctx) {
+async function callTool(params, env, ctx, request) {
   const name = params?.name;
   const args = params?.arguments ?? {};
 
@@ -403,6 +482,21 @@ async function callTool(params, env, ctx) {
     throw new RpcError(JSON_RPC.INVALID_PARAMS, "arguments must be an object");
   }
 
+  // Metering runs before the work, so an unpaid caller never costs us the
+  // upstream fetch and the parse.
+  const decision = await authorize(env, {
+    tool: name,
+    apiKey: extractApiKey(request),
+    ip: request?.headers?.get("cf-connecting-ip"),
+  });
+  if (!decision.allowed) {
+    return {
+      content: [{ type: "text", text: JSON.stringify(paymentRequired(decision, name), null, 2) }],
+      structuredContent: paymentRequired(decision, name),
+      isError: true,
+    };
+  }
+
   try {
     switch (name) {
       case "lookup_company":
@@ -411,6 +505,10 @@ async function callTool(params, env, ctx) {
         return ok(await toolRecentFilings(args, ctx));
       case "company_financials":
         return ok(await toolCompanyFinancials(args, ctx));
+      case "filing_section":
+        return ok(await toolFilingSection(args, ctx));
+      case "compare_filings":
+        return ok(await toolCompareFilings(args, ctx));
       default:
         throw new RpcError(JSON_RPC.INVALID_PARAMS, `unknown tool: ${name}`);
     }
@@ -553,6 +651,188 @@ async function toolCompanyFinancials(args, ctx) {
     returned: points.length,
     note: "As-reported values. Not restated or adjusted; cite accessionNumber and filed date.",
     points,
+  };
+}
+
+// --------------------------------------------------- sections and diffing
+
+const MAX_SECTION_CHARS = 200_000;
+const DEFAULT_SECTION_CHARS = 50_000;
+
+function parseAccession(v, field) {
+  if (v === undefined || v === null || v === "") return null;
+  const s = str(v).trim();
+  if (!/^\d{10}-?\d{2}-?\d{6}$/.test(s)) {
+    throw new RpcError(JSON_RPC.INVALID_PARAMS, `${field} must look like 0000320193-26-000020`);
+  }
+  const bare = s.replace(/-/g, "");
+  return `${bare.slice(0, 10)}-${bare.slice(10, 12)}-${bare.slice(12)}`;
+}
+
+// Finds filings of a form, newest first. Pinning by accession is exact; without
+// it we return the recent ones so callers can see what they got.
+function findFilings(sub, form, wantAccessions = []) {
+  const recent = sub?.filings?.recent;
+  if (!recent || !Array.isArray(recent.accessionNumber)) {
+    throw new ToolError("no filing index available for this company");
+  }
+  const out = [];
+  for (let i = 0; i < recent.accessionNumber.length; i++) {
+    const f = str(recent.form?.[i]).toUpperCase();
+    const accession = str(recent.accessionNumber?.[i]);
+    const matchesForm = !form || f === form;
+    const matchesPin = wantAccessions.length ? wantAccessions.includes(accession) : true;
+    if (matchesForm && matchesPin) {
+      out.push({
+        accession,
+        form: f,
+        filingDate: str(recent.filingDate?.[i]),
+        reportDate: str(recent.reportDate?.[i]),
+        primaryDocument: str(recent.primaryDocument?.[i]),
+      });
+    }
+    if (!wantAccessions.length && out.length >= 8) break;
+  }
+  return out;
+}
+
+async function fetchFilingText(cik, filing, ctx) {
+  const url = filingUrl(cik, filing.accession, filing.primaryDocument);
+  if (!url) throw new ToolError(`could not build a document URL for ${filing.accession}`);
+  const html = await secFetchText(
+    url,
+    SUBMISSIONS_TTL,
+    ctx,
+    { 404: `filing document not found for ${filing.accession}` },
+    MAX_FILING_BYTES,
+  );
+  const text = htmlToText(html);
+  if (!text || text.length < 500) throw new ToolError(`filing ${filing.accession} produced no readable text`);
+  return text;
+}
+
+async function resolveOne(cik, sub, { form, accession }, ctx, label) {
+  const pinned = parseAccession(accession, label);
+  const matches = findFilings(sub, form, pinned ? [pinned] : []);
+  if (!matches.length) {
+    throw new ToolError(
+      pinned
+        ? `no filing ${pinned} found in this company's recent index`
+        : `no ${form} found in this company's recent filing index`,
+    );
+  }
+  return matches[0];
+}
+
+async function toolFilingSection(args, ctx) {
+  const cik = await resolveCik(args.company, ctx);
+  const form = parseForm(args.form) || "10-K";
+  const maxChars = Math.min(
+    MAX_SECTION_CHARS,
+    Math.max(1000, Number(args.max_chars) || DEFAULT_SECTION_CHARS),
+  );
+
+  const sub = await fetchSubmissions(cik, ctx);
+  const filing = await resolveOne(cik, sub, { form, accession: args.accession }, ctx, "accession");
+
+  const catalog = itemCatalog(form).map(([id, title]) => ({ item: id, title }));
+
+  // No item requested: tell the caller what is available rather than guessing.
+  if (args.item === undefined || args.item === null || args.item === "") {
+    return {
+      cik,
+      company: clean(sub.name),
+      filing,
+      pinned: Boolean(args.accession),
+      availableItems: catalog,
+      note: "Call again with `item` to extract one. Pass `accession` to pin this exact filing.",
+      documentUrl: filingUrl(cik, filing.accession, filing.primaryDocument),
+    };
+  }
+
+  const wanted = str(args.item).toUpperCase().replace(/^ITEM\s*/i, "").trim();
+  if (!knownItem(form, wanted)) {
+    throw new RpcError(
+      JSON_RPC.INVALID_PARAMS,
+      `unknown item "${wanted}" for ${form}. Available: ${catalog.map((c) => c.item).join(", ")}`,
+    );
+  }
+
+  const text = await fetchFilingText(cik, filing, ctx);
+  const section = extractItem(text, form, wanted);
+  if (!section) {
+    throw new ToolError(
+      `could not locate Item ${wanted} in ${filing.accession}. Filings vary in layout; try another item or the document URL.`,
+    );
+  }
+
+  const truncated = section.length > maxChars;
+  return {
+    cik,
+    company: clean(sub.name),
+    filing,
+    pinned: Boolean(args.accession),
+    item: wanted,
+    itemTitle: (knownItem(form, wanted) || [])[1] || null,
+    characters: section.length,
+    truncated,
+    documentUrl: filingUrl(cik, filing.accession, filing.primaryDocument),
+    text: truncated ? section.slice(0, maxChars) : section,
+  };
+}
+
+async function toolCompareFilings(args, ctx) {
+  const cik = await resolveCik(args.company, ctx);
+  const form = parseForm(args.form) || "10-K";
+  const item = str(args.item || "1A").toUpperCase().replace(/^ITEM\s*/i, "").trim();
+  const maxPassages = Math.min(200, Math.max(5, Number(args.max_passages) || 40));
+
+  if (!knownItem(form, item)) {
+    throw new RpcError(JSON_RPC.INVALID_PARAMS, `unknown item "${item}" for ${form}`);
+  }
+
+  const sub = await fetchSubmissions(cik, ctx);
+
+  let older;
+  let newer;
+  if (args.from_accession || args.to_accession) {
+    if (!args.from_accession || !args.to_accession) {
+      throw new RpcError(JSON_RPC.INVALID_PARAMS, "pass both from_accession and to_accession, or neither");
+    }
+    older = await resolveOne(cik, sub, { form: null, accession: args.from_accession }, ctx, "from_accession");
+    newer = await resolveOne(cik, sub, { form: null, accession: args.to_accession }, ctx, "to_accession");
+  } else {
+    const matches = findFilings(sub, form, []);
+    if (matches.length < 2) throw new ToolError(`need two ${form} filings to compare; found ${matches.length}`);
+    newer = matches[0];
+    older = matches[1];
+  }
+
+  const [oldText, newText] = await Promise.all([
+    fetchFilingText(cik, older, ctx),
+    fetchFilingText(cik, newer, ctx),
+  ]);
+
+  const oldSection = extractItem(oldText, form, item);
+  const newSection = extractItem(newText, form, item);
+  if (!oldSection || !newSection) {
+    throw new ToolError(
+      `could not locate Item ${item} in ${!oldSection ? older.accession : newer.accession}`,
+    );
+  }
+
+  const diff = diffSections(oldSection, newSection, { maxItems: maxPassages });
+
+  return {
+    cik,
+    company: clean(sub.name),
+    item,
+    itemTitle: (knownItem(form, item) || [])[1] || null,
+    from: older,
+    to: newer,
+    pinned: Boolean(args.from_accession && args.to_accession),
+    ...diff,
+    note: "Passages are compared after normalising case, punctuation and whitespace, so reformatting alone does not register as a change.",
   };
 }
 

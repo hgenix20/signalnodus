@@ -1,4 +1,5 @@
 import { handleMcp } from "./mcp.js";
+import { createCheckout, handleWebhook, keyBalance, packSummary } from "./payments.js";
 
 // Signal Nodus — one Worker serving all signalnodus.ai hosts.
 // Canonical host: signalnodus.ai (www 301s here; .com redirects at the zone edge).
@@ -80,6 +81,46 @@ async function apexResponse(request, url, env) {
     }
     return verifyContact(request, env);
   }
+
+  if (url.pathname === "/api/checkout" && request.method === "POST") {
+    return createCheckout(request, env);
+  }
+  if (url.pathname === "/api/stripe-webhook" && request.method === "POST") {
+    return handleWebhook(request, env);
+  }
+  if (url.pathname === "/api/balance") {
+    return keyBalance(request, env);
+  }
+  if (url.pathname === "/api/pricing") {
+    return json({
+      model: "per use, no subscription, no minimum",
+      free: "25 billable calls per day per IP, no signup and no card",
+      prices: { filing_section: "$0.02", compare_filings: "$0.10", lookup_company: "free", recent_filings: "free", company_financials: "free" },
+      packs: packSummary(),
+      compare:
+        "sec-api.io gates 10-K/10-Q section extraction behind its $239/mo Business tier (their pricing page, checked 2026-08-15). Here the same job is $0.10 and you pay nothing until you use it.",
+    });
+  }
+  if (url.pathname === "/key") {
+    const k = url.searchParams.get("k") || "";
+    const safe = /^sn_live_[a-f0-9]{48}$/.test(k) ? k : null;
+    return html(
+      pageShell(
+        "Your API key · Signal Nodus",
+        `<main class="wrap pad">
+          <h1 class="h1">Your API key</h1>
+          ${safe
+            ? `<pre class="block">${safe}</pre><p class="dim narrow">Save it now. Send it as <code>Authorization: Bearer &lt;key&gt;</code>. Check the balance any time at <code>/api/balance</code>.</p>`
+            : `<p class="dim narrow">No key in this link. If you just paid and cannot find your key, email <a href="mailto:hgenix@agentmail.to">hgenix@agentmail.to</a>.</p>`}
+          <p class="mt"><a href="/pricing">Pricing</a> · <a href="/">Home</a></p>
+        </main>`,
+        { canonical: null, index: false },
+      ),
+      200,
+      NOINDEX,
+    );
+  }
+  if (url.pathname === "/pricing") return html(pricingPage());
 
   if (url.pathname === "/health") return json({ ok: true });
   if (url.pathname === "/site.css") return asset(BASE_CSS, "text/css");
@@ -302,6 +343,9 @@ const BASE_CSS = `
   .sub { margin-top: 14px; color: var(--dim); max-width: 58ch; }
   h2 { font-size: 20px; margin-bottom: 14px; }
   .ok { color: var(--accent); }
+  table.packs { border-collapse: collapse; margin-top: 8px; }
+  table.packs th, table.packs td { text-align: left; padding: 8px 22px 8px 0; border-bottom: 1px solid var(--line); }
+  table.packs th { color: var(--dim); font-weight: 600; font-size: 14px; }
 `;
 
 function siteScript(env) {
@@ -435,4 +479,77 @@ curl https://api.signalnodus.ai/v1/signals <span class="dim"># 501: not built</s
   </section>
 </main>`;
   return pageShell("Signal Nodus", inner, { turnstile: true });
+}
+
+function pricingPage() {
+  const rows = packSummary()
+    .map(
+      (p) => `<tr><td>${p.label}</td><td>${p.price}</td><td>${p.credits} credit</td><td>${p.diffs} diffs</td></tr>`,
+    )
+    .join("");
+
+  return pageShell(
+    "Pricing · Signal Nodus",
+    `<main class="wrap">
+      <section class="hero">
+        <h1>Pay per job. No subscription.</h1>
+        <p class="lede">
+          Reading company data is free. You only pay when the service does real
+          work: pulling a section out of a filing, or diffing two of them.
+        </p>
+      </section>
+
+      <section>
+        <h2>Prices</h2>
+        <pre class="block">lookup_company        free
+recent_filings        free
+company_financials    free
+
+filing_section        $0.02   one item extracted from a 10-K or 10-Q
+compare_filings       $0.10   the same item diffed across two filings</pre>
+        <p class="sub">
+          The first <strong>25 billable calls each day are free</strong>, with no
+          signup and no card. Past that you buy credit.
+        </p>
+      </section>
+
+      <section class="mt">
+        <h2>Credit packs</h2>
+        <table class="packs">
+          <tr><th>Pack</th><th>Price</th><th>Credit</th><th>Roughly</th></tr>
+          ${rows}
+        </table>
+        <p class="sub">Credit does not expire. There is no monthly fee to cancel.</p>
+      </section>
+
+      <section class="mt">
+        <h2>Why this is cheaper</h2>
+        <p class="sub">
+          sec-api.io puts 10-K/10-Q section extraction on its Business tier at
+          <strong>$239/month</strong>, and its $55/month entry tier does not
+          include extraction at all (their pricing page, checked 15 Aug 2026).
+          Intrinio starts at $150/month for SEC-derived fundamentals.
+        </p>
+        <p class="sub">
+          Those are subscriptions: you pay the floor whether you run one job or
+          a thousand. Here the same year-over-year diff is <strong>$0.10</strong>
+          and the floor is zero. You would need about <strong>2,400 diffs a
+          month</strong> before this costs what the $239 tier costs.
+        </p>
+      </section>
+
+      <section class="mt">
+        <h2>Buy credit</h2>
+        <pre class="block">curl -X POST https://signalnodus.ai/api/checkout \
+  -H 'content-type: application/json' \
+  -d '{"pack":"starter"}'</pre>
+        <p class="sub">
+          Returns a Stripe checkout link. Pay it and your key is on the success
+          page. Then send <code>Authorization: Bearer &lt;key&gt;</code> and check
+          <code>/api/balance</code> whenever you like.
+        </p>
+      </section>
+    </main>`,
+    { canonical: "https://signalnodus.ai/pricing" },
+  );
 }
