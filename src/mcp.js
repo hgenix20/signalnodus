@@ -536,7 +536,7 @@ function toolError(message) {
   return { content: [{ type: "text", text: message }], isError: true };
 }
 
-async function toolLookupCompany(args, ctx) {
+export async function toolLookupCompany(args, ctx) {
   const cik = await resolveCik(args.company, ctx);
   const sub = await fetchSubmissions(cik, ctx);
   const budget = { left: MAX_ISSUER_TEXT };
@@ -553,7 +553,7 @@ async function toolLookupCompany(args, ctx) {
   };
 }
 
-async function toolRecentFilings(args, ctx) {
+export async function toolRecentFilings(args, ctx) {
   const cik = await resolveCik(args.company, ctx);
   const form = parseForm(args.form);
   const limit = parseLimit(args.limit);
@@ -603,7 +603,7 @@ async function toolRecentFilings(args, ctx) {
   };
 }
 
-async function toolCompanyFinancials(args, ctx) {
+export async function toolCompanyFinancials(args, ctx) {
   const cik = await resolveCik(args.company, ctx);
   const concept = str(args.concept);
   if (!CONCEPTS.has(concept)) {
@@ -722,7 +722,7 @@ async function resolveOne(cik, sub, { form, accession }, ctx, label) {
   return matches[0];
 }
 
-async function toolFilingSection(args, ctx) {
+export async function toolFilingSection(args, ctx) {
   const cik = await resolveCik(args.company, ctx);
   const form = parseForm(args.form) || "10-K";
   const maxChars = Math.min(
@@ -779,7 +779,7 @@ async function toolFilingSection(args, ctx) {
   };
 }
 
-async function toolCompareFilings(args, ctx) {
+export async function toolCompareFilings(args, ctx) {
   const cik = await resolveCik(args.company, ctx);
   const form = parseForm(args.form) || "10-K";
   const item = str(args.item || "1A").toUpperCase().replace(/^ITEM\s*/i, "").trim();

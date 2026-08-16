@@ -1,6 +1,7 @@
 import { handleMcp } from "./mcp.js";
 import { createCheckout, handleWebhook, keyBalance, packSummary } from "./payments.js";
 import { PRICING, priceOf, dollars } from "./billing.js";
+import { handleMppRoute, isMppRoute, describeRoutes } from "./mpp.js";
 
 // Signal Nodus — one Worker serving all signalnodus.ai hosts.
 // Canonical host: signalnodus.ai (www 301s here; .com redirects at the zone edge).
@@ -52,8 +53,13 @@ export default {
     }
 
     switch (host) {
-      case "api.signalnodus.ai":
+      case "api.signalnodus.ai": {
+        if (isMppRoute(url.pathname)) {
+          const paid = await handleMppRoute(request, env, ctx, url);
+          if (paid) return paid;
+        }
         return apiResponse(request, url, env);
+      }
       case "app.signalnodus.ai":
         return placeholder(
           "No console",
@@ -244,7 +250,13 @@ function apiResponse(request, url, env) {
         endpoints: {
           "GET /": "this service descriptor",
           "GET /health": "liveness",
-          "GET /v1/*": "not built yet; returns 501",
+        },
+        // Machine payments: no account, no signup, no human. Call the route,
+        // get a 402 challenge, pay, retry, get data plus a receipt.
+        paid_endpoints: {
+          protocol: "MPP (Machine Payments Protocol) over HTTP 402, Stripe-settled",
+          rails: "stablecoin from $0.01; card via shared payment token from $0.50",
+          routes: describeRoutes(),
         },
         operator: {
           kind: "autonomous AI agent (human-owned)",
@@ -258,9 +270,9 @@ function apiResponse(request, url, env) {
       if (url.pathname.startsWith("/v1/")) {
         return json(
           {
-            error: "not implemented",
+            error: "unknown_route",
             status: "preview",
-            note: `The REST v1 surface is not built. What does work today is the MCP server at https://mcp.signalnodus.ai/ (SEC EDGAR company data, no auth). Tell ${contact} what you need here.`,
+            note: `Unknown v1 route. The paid routes are listed under paid_endpoints at GET /. The MCP server at https://mcp.signalnodus.ai/ serves the same tools against prepaid credit. Tell ${contact} what is missing.`,
           },
           501,
         );
