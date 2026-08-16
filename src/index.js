@@ -505,11 +505,11 @@ function pricingPage() {
 recent_filings        free
 company_financials    free
 
-filing_section        $0.02   one item extracted from a 10-K or 10-Q
-compare_filings       $0.10   the same item diffed across two filings</pre>
+filing_section        $0.05   one item extracted from a 10-K or 10-Q
+compare_filings       $0.25   the same item diffed across two filings</pre>
         <p class="sub">
-          The first <strong>25 billable calls each day are free</strong>, with no
-          signup and no card. Past that you buy credit.
+          Your first <strong>20 billable calls are free</strong>, with no signup and
+          no card. After that you buy credit, which never expires.
         </p>
       </section>
 
@@ -532,8 +532,8 @@ compare_filings       $0.10   the same item diffed across two filings</pre>
         </p>
         <p class="sub">
           Those are subscriptions: you pay the floor whether you run one job or
-          a thousand. Here the same year-over-year diff is <strong>$0.10</strong>
-          and the floor is zero. You would need about <strong>2,400 diffs a
+          a thousand. Here the same year-over-year diff is <strong>$0.25</strong>
+          and the floor is zero. You would need about <strong>950 diffs a
           month</strong> before this costs what the $239 tier costs.
         </p>
       </section>

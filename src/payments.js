@@ -9,14 +9,14 @@
 // no plaintext key is ever written to the database. The webhook credits the
 // hash after Stripe confirms payment.
 
-import { hashKey, UNITS_PER_DOLLAR, dollars } from "./billing.js";
+import { hashKey, dollars, priceOf } from "./billing.js";
 
 // Bonus credit on the larger packs is the volume discount. Compare against an
 // incumbent charging $239/mo before you may extract a section at all.
 export const PACKS = {
-  starter: { cents: 1000, units: 10_000, label: "Starter" },
-  builder: { cents: 5000, units: 55_000, label: "Builder" },
-  scale: { cents: 20_000, units: 240_000, label: "Scale" },
+  starter: { cents: 900, units: 10_000, label: "Starter" },
+  builder: { cents: 3900, units: 45_000, label: "Builder" },
+  scale: { cents: 14_900, units: 190_000, label: "Scale" },
 };
 
 export function packSummary() {
@@ -25,8 +25,8 @@ export function packSummary() {
     label: p.label,
     price: `$${(p.cents / 100).toFixed(2)}`,
     credits: dollars(p.units),
-    diffs: Math.floor(p.units / 100),
-    sections: Math.floor(p.units / 20),
+    diffs: Math.floor(p.units / 250),
+    sections: Math.floor(p.units / 50),
   }));
 }
 
@@ -200,7 +200,7 @@ export async function keyBalance(request, env) {
       active: Boolean(row.active),
       balance: dollars(row.credits),
       balance_units: row.credits,
-      diffs_remaining: Math.floor(row.credits / 100),
+      diffs_remaining: Math.floor(row.credits / priceOf("compare_filings")),
       created_at: row.created_at,
       last_used: row.last_used,
     });

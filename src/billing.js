@@ -8,9 +8,9 @@
 //
 // So the incumbent price of a section-extraction capability is a few hundred
 // dollars a month with a floor you pay whether you use it or not. We charge per
-// finished job with no subscription and no floor, which means a buyer doing
-// fewer than ~2,400 diffs a month pays less here, and a buyer doing ten pays
-// almost nothing instead of $239.
+// finished job with no subscription and no floor: a buyer doing fewer than
+// ~950 diffs a month pays less here, and one doing thirty pays about $8
+// instead of $239.
 //
 // Credits are integer tenths-of-a-cent. 1000 = $1.00. No floats touch money.
 
@@ -22,11 +22,15 @@ export const PRICING = {
   lookup_company: 0,
   recent_filings: 0,
   company_financials: 0,
-  filing_section: 20, // $0.02 — one section pulled out of a filing
-  compare_filings: 100, // $0.10 — the finished year-over-year diff
+  filing_section: 50, // $0.05 — one section pulled out of a filing
+  compare_filings: 250, // $0.25 — the finished year-over-year diff
 };
 
-export const FREE_DAILY_BILLABLE = 25;
+// A trial, not an allowance. A buyer tracking 100 companies runs about 33
+// diffs a month, so a *daily* free tier of any size means they never pay and
+// we never learn whether the price is right. Twenty calls is enough to
+// evaluate the thing and not enough to run on.
+export const FREE_TRIAL_TOTAL = 20;
 
 export function priceOf(tool) {
   return PRICING[tool] ?? 0;
@@ -40,10 +44,6 @@ export async function hashKey(key) {
   const data = new TextEncoder().encode(key);
   const digest = await crypto.subtle.digest("SHA-256", data);
   return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
-}
-
-function today() {
-  return new Date().toISOString().slice(0, 10);
 }
 
 /**
@@ -98,23 +98,22 @@ async function chargeKey(db, apiKey, tool, cost) {
 
 async function chargeFreeTier(db, ip, tool, cost) {
   const subject = `ip:${ip || "unknown"}`;
-  const day = today();
   const row = await db
-    .prepare("SELECT COUNT(*) AS n FROM usage WHERE subject = ? AND day = ? AND billable = 1")
-    .bind(subject, day)
+    .prepare("SELECT COUNT(*) AS n FROM usage WHERE subject = ? AND billable = 1")
+    .bind(subject)
     .first();
 
   const used = Number(row?.n || 0);
-  if (used >= FREE_DAILY_BILLABLE) {
-    return { allowed: false, reason: "free_tier_exhausted", cost, used, limit: FREE_DAILY_BILLABLE };
+  if (used >= FREE_TRIAL_TOTAL) {
+    return { allowed: false, reason: "free_trial_used", cost, used, limit: FREE_TRIAL_TOTAL };
   }
 
   await logUsage(db, subject, tool, 0, 1);
   return {
     allowed: true,
     cost: 0,
-    tier: "free",
-    remainingToday: FREE_DAILY_BILLABLE - used - 1,
+    tier: "trial",
+    trialRemaining: FREE_TRIAL_TOTAL - used - 1,
   };
 }
 
@@ -140,11 +139,11 @@ export function paymentRequired(decision, tool) {
     contact: "hgenix@agentmail.to",
   };
 
-  if (decision.reason === "free_tier_exhausted") {
+  if (decision.reason === "free_trial_used") {
     return {
       ...base,
-      reason: `Free tier used up for today (${decision.limit} billable calls per day, no signup needed). It resets at 00:00 UTC.`,
-      free_daily_limit: decision.limit,
+      reason: `Free trial used up (${decision.limit} billable calls, no signup required). Buy credit to continue; there is no subscription and credit does not expire.`,
+      free_trial_total: decision.limit,
     };
   }
   if (decision.reason === "insufficient_credits") {
