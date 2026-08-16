@@ -1,5 +1,6 @@
 import { handleMcp } from "./mcp.js";
 import { createCheckout, handleWebhook, keyBalance, packSummary } from "./payments.js";
+import { PRICING, priceOf, dollars } from "./billing.js";
 
 // Signal Nodus — one Worker serving all signalnodus.ai hosts.
 // Canonical host: signalnodus.ai (www 301s here; .com redirects at the zone edge).
@@ -93,12 +94,19 @@ async function apexResponse(request, url, env) {
   }
   if (url.pathname === "/api/pricing") {
     return json({
-      model: "per use, no subscription, no minimum",
-      free: "25 billable calls per day per IP, no signup and no card",
-      prices: { filing_section: "$0.02", compare_filings: "$0.10", lookup_company: "free", recent_filings: "free", company_financials: "free" },
+      model: "per call, no subscription, no free tier",
+      free_tier:
+        "none. Every data call is priced. Only the MCP handshake (initialize, tools/list) is free, because clients call it automatically to discover what exists.",
+      // Generated from the same table the meter charges from, so this endpoint
+      // cannot drift away from what a caller is actually billed.
+      prices: Object.fromEntries(
+        Object.keys(PRICING).map((tool) => [tool, dollars(priceOf(tool))]),
+      ),
       packs: packSummary(),
+      minimums:
+        "Stripe machine payments: 0.01 USDC minimum for stablecoin, 0.50 USD minimum for card via shared payment tokens. compare_filings is priced at $0.50 so it clears both.",
       compare:
-        "sec-api.io gates 10-K/10-Q section extraction behind its $239/mo Business tier (their pricing page, checked 2026-08-15). Here the same job is $0.10 and you pay nothing until you use it.",
+        "sec-api.io gates 10-K/10-Q section extraction behind its $239/mo Business tier (their pricing page, checked 2026-08-15). Here the same job is $0.50 and there is no monthly floor.",
     });
   }
   if (url.pathname === "/key") {
@@ -269,6 +277,10 @@ function json(obj, status = 200, extra = {}) {
     headers: {
       "content-type": "application/json; charset=utf-8",
       "access-control-allow-origin": "*",
+      // Never let a price list or a balance be served from cache: a caller
+      // reading a stale price and then being charged the current one is the
+      // one billing bug you cannot apologise your way out of.
+      "cache-control": "no-store",
       ...SECURITY_HEADERS,
       ...extra,
     },
@@ -452,7 +464,7 @@ function landingPage() {
     </p>
     <p class="sub">
       Scope, stated plainly: SEC filings only. <strong>No</strong> prices, news,
-      non-US-listed companies, or forecasts. It is free, there is no pricing yet,
+      non-US-listed companies, or forecasts. Every call is priced, from $0.01,
       and it is <span class="ok">preview</span> quality.
     </p>
   </section>
@@ -494,22 +506,23 @@ function pricingPage() {
       <section class="hero">
         <h1>Pay per job. No subscription.</h1>
         <p class="lede">
-          Reading company data is free. You only pay when the service does real
-          work: pulling a section out of a filing, or diffing two of them.
+          Every call is priced by the work it does, from a cent for a lookup to
+          fifty for a finished year-over-year diff. No subscription, no floor.
         </p>
       </section>
 
       <section>
         <h2>Prices</h2>
-        <pre class="block">lookup_company        free
-recent_filings        free
-company_financials    free
+        <pre class="block">lookup_company        $0.01
+recent_filings        $0.01
+company_financials    $0.01
 
 filing_section        $0.05   one item extracted from a 10-K or 10-Q
-compare_filings       $0.25   the same item diffed across two filings</pre>
+compare_filings       $0.50   the same item diffed across two filings</pre>
         <p class="sub">
-          Your first <strong>20 billable calls are free</strong>, with no signup and
-          no card. After that you buy credit, which never expires.
+          <strong>There is no free tier.</strong> This is built for agents, and an
+          agent does not need a trial: it needs a price and a way to pay. Every
+          data call is charged. Credit never expires and there is no subscription.
         </p>
       </section>
 
@@ -532,8 +545,8 @@ compare_filings       $0.25   the same item diffed across two filings</pre>
         </p>
         <p class="sub">
           Those are subscriptions: you pay the floor whether you run one job or
-          a thousand. Here the same year-over-year diff is <strong>$0.25</strong>
-          and the floor is zero. You would need about <strong>950 diffs a
+          a thousand. Here the same year-over-year diff is <strong>$0.50</strong>
+          and the floor is zero. You would need about <strong>480 diffs a
           month</strong> before this costs what the $239 tier costs.
         </p>
       </section>

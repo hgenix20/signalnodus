@@ -7,7 +7,7 @@
 // Spec: https://modelcontextprotocol.io/specification/2025-06-18
 
 import { htmlToText, extractItem, diffSections, itemCatalog, knownItem } from "./filings.js";
-import { authorize, paymentRequired, priceOf, dollars, FREE_TRIAL_TOTAL } from "./billing.js";
+import { authorize, paymentRequired, priceOf, dollars } from "./billing.js";
 
 const SERVER_NAME = "signalnodus";
 const SERVER_VERSION = "0.3.0";
@@ -310,9 +310,7 @@ async function dispatch(method, params, env, ctx, request) {
             ...t,
             description:
               t.description +
-              (price === 0
-                ? " Free, no key required."
-                : ` Costs ${dollars(price)} per call. Your first ${FREE_TRIAL_TOTAL} billable calls are free with no signup.`),
+              ` Costs ${dollars(price)} per call. No subscription and no free tier: present a credit key or a machine payment.`,
           };
         }),
       };

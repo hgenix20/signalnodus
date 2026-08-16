@@ -16,21 +16,24 @@
 
 export const UNITS_PER_DOLLAR = 1000;
 
-// Reads are free: they are the on-ramp, they are cheap to serve, and charging
-// for them would just push people back to fetching EDGAR themselves.
+// Every call that does work costs money. A free tier is a human marketing
+// device: a person needs to try before typing a card number. An agent does not
+// evaluate, it calls, and if paying is one header then there is nothing for a
+// trial to solve. The only free surface is the MCP handshake itself
+// (initialize, tools/list), because clients call those automatically to learn
+// what exists and charging for discovery would just make the server invisible.
+//
+// $0.01 is the floor because that is the stablecoin minimum on Stripe machine
+// payments. $0.50 on the flagship job is the card floor: Stripe requires at
+// least 0.50 USD for a card payment made with a shared payment token, so
+// anything cheaper is stablecoin-only and locks out every card-paying agent.
 export const PRICING = {
-  lookup_company: 0,
-  recent_filings: 0,
-  company_financials: 0,
-  filing_section: 50, // $0.05 — one section pulled out of a filing
-  compare_filings: 250, // $0.25 — the finished year-over-year diff
+  lookup_company: 10, // $0.01
+  recent_filings: 10, // $0.01
+  company_financials: 10, // $0.01
+  filing_section: 50, // $0.05
+  compare_filings: 500, // $0.50 — clears the card minimum, so both rails work
 };
-
-// A trial, not an allowance. A buyer tracking 100 companies runs about 33
-// diffs a month, so a *daily* free tier of any size means they never pay and
-// we never learn whether the price is right. Twenty calls is enough to
-// evaluate the thing and not enough to run on.
-export const FREE_TRIAL_TOTAL = 20;
 
 export function priceOf(tool) {
   return PRICING[tool] ?? 0;
@@ -62,7 +65,8 @@ export async function authorize(env, { tool, apiKey, ip }) {
 
   try {
     if (apiKey) return await chargeKey(db, apiKey, tool, cost);
-    return await chargeFreeTier(db, ip, tool, cost);
+    // No credential: this is where a machine payment challenge belongs.
+    return { allowed: false, reason: "payment_required", cost };
   } catch (err) {
     console.error("billing unavailable", err);
     return { allowed: true, cost: 0, tier: "degraded", note: "billing unavailable, served free" };
@@ -96,27 +100,6 @@ async function chargeKey(db, apiKey, tool, cost) {
   return { allowed: true, cost, tier: "paid", balance: row.credits - cost };
 }
 
-async function chargeFreeTier(db, ip, tool, cost) {
-  const subject = `ip:${ip || "unknown"}`;
-  const row = await db
-    .prepare("SELECT COUNT(*) AS n FROM usage WHERE subject = ? AND billable = 1")
-    .bind(subject)
-    .first();
-
-  const used = Number(row?.n || 0);
-  if (used >= FREE_TRIAL_TOTAL) {
-    return { allowed: false, reason: "free_trial_used", cost, used, limit: FREE_TRIAL_TOTAL };
-  }
-
-  await logUsage(db, subject, tool, 0, 1);
-  return {
-    allowed: true,
-    cost: 0,
-    tier: "trial",
-    trialRemaining: FREE_TRIAL_TOTAL - used - 1,
-  };
-}
-
 async function logUsage(db, subject, tool, cost, billable) {
   const now = new Date().toISOString();
   await db
@@ -139,15 +122,19 @@ export function paymentRequired(decision, tool) {
     contact: "hgenix@agentmail.to",
   };
 
-  if (decision.reason === "free_trial_used") {
-    return {
-      ...base,
-      reason: `Free trial used up (${decision.limit} billable calls, no signup required). Buy credit to continue; there is no subscription and credit does not expire.`,
-      free_trial_total: decision.limit,
-    };
-  }
   if (decision.reason === "insufficient_credits") {
     return { ...base, reason: "Not enough credits on this key.", balance: dollars(decision.balance || 0) };
+  }
+  if (decision.reason === "payment_required") {
+    return {
+      ...base,
+      reason:
+        "This call costs money and no payment credential was presented. Every data call is priced; there is no free tier and no subscription.",
+      pay_with: {
+        credit_key: "Buy credit at https://signalnodus.ai/pricing, then send Authorization: Bearer <key>",
+        machine_payments: "Stripe MPP / x402 per-call payment is being enabled; see /api/pricing for status",
+      },
+    };
   }
   if (decision.reason === "unknown_key") {
     return { ...base, reason: "That API key is not recognised." };
