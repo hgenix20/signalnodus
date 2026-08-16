@@ -41,6 +41,12 @@ const ITEMS_10Q = [
   ["6", "Exhibits"],
 ];
 
+// A section this long is unambiguously the real thing rather than a contents
+// entry. Below it we need the positional tie-breaker.
+const SUBSTANTIAL_SECTION = 400;
+// Short enough to be "Item 1B. Unresolved Staff Comments None." and no shorter.
+const MIN_SECTION = 25;
+
 export function itemCatalog(form) {
   const f = String(form || "").toUpperCase();
   if (f.startsWith("10-Q")) return ITEMS_10Q;
@@ -133,19 +139,28 @@ export function extractItem(text, form, itemId) {
   // Candidate ends: any later item heading in the catalog.
   const laterIds = catalog.slice(idx + 1).map(([id]) => id);
 
-  let best = null;
+  const candidates = [];
   for (const start of starts) {
     let end = text.length;
     for (const laterId of laterIds) {
       const m = firstMatchFrom(text, itemHeadingRegex(laterId), start + 1);
       if (m !== -1 && m < end) end = m;
     }
-    const body = text.slice(start, end).trim();
-    if (!best || body.length > best.body.length) best = { start, end, body };
+    candidates.push({ start, body: text.slice(start, end).trim() });
   }
+  if (candidates.length === 0) return null;
 
-  if (!best || best.body.length < 200) return null;
-  return best.body;
+  const longest = candidates.reduce((a, b) => (b.body.length > a.body.length ? b : a));
+
+  // Normally the real section is the longest match and the short ones are
+  // contents-page entries. But some items are genuinely one line: Item 1B is
+  // almost always "None." If every candidate is short, the contents entry and
+  // the real section are both short, so take the last one, because the body of
+  // a filing always follows its table of contents.
+  if (longest.body.length >= SUBSTANTIAL_SECTION) return longest.body;
+
+  const last = candidates[candidates.length - 1];
+  return last.body.length >= MIN_SECTION ? last.body : null;
 }
 
 function allMatches(text, re) {

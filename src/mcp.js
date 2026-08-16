@@ -655,7 +655,10 @@ export async function toolCompanyFinancials(args, ctx) {
 // --------------------------------------------------- sections and diffing
 
 const MAX_SECTION_CHARS = 200_000;
-const DEFAULT_SECTION_CHARS = 50_000;
+// An agent pays for every token it is handed, so the default is a readable
+// slice rather than the whole section. Callers who genuinely want all of it
+// ask for it with max_chars.
+const DEFAULT_SECTION_CHARS = 12_000;
 
 function parseAccession(v, field) {
   if (v === undefined || v === null || v === "") return null;
@@ -766,6 +769,9 @@ export async function toolFilingSection(args, ctx) {
 
   const truncated = section.length > maxChars;
   return {
+    truncationNote: truncated
+      ? `Returned the first ${maxChars} of ${section.length} characters. Pass max_chars up to ${MAX_SECTION_CHARS} for more.`
+      : null,
     cik,
     company: clean(sub.name),
     filing,
