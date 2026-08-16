@@ -85,7 +85,33 @@ export function htmlToText(html) {
   s = s.replace(/[ \t ]+/g, " ");
   s = s.replace(/ *\n */g, "\n");
   s = s.replace(/\n{3,}/g, "\n\n");
-  return s.trim();
+
+  return stripRunningHeaders(s).trim();
+}
+
+// Filings repeat a running header or footer on every printed page, and the
+// renderer drops it into the middle of a sentence. It reads as noise on its
+// own, but the real damage is in diffing: footers carry page numbers, page
+// numbers move between years, and every one of them would then register as a
+// substantive change.
+const RUNNING_HEADER = [
+  /^\s*\d{1,4}\s*$/, // a bare page number
+  /\|\s*(19|20)\d\d\s+Form\s+10-[KQ]\s*\|/i, // "Apple Inc. | 2025 Form 10-K | 21"
+  /^\s*Form\s+10-[KQ]\s*\|\s*\d+\s*$/i,
+  /^\s*Table of Contents\s*$/i,
+  /^\s*\(continued\)\s*$/i,
+];
+
+function stripRunningHeaders(text) {
+  return text
+    .split("\n")
+    .filter((line) => {
+      // Real prose is never a running header, so never risk cutting it.
+      if (line.length > 120) return true;
+      return !RUNNING_HEADER.some((re) => re.test(line));
+    })
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n");
 }
 
 const ENTITIES = {
