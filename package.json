@@ -11,6 +11,7 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "@coinbase/x402": "^2.1.0",
     "mppx": "^0.8.17",
     "stripe": "^22.5.0"
   }

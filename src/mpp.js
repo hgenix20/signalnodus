@@ -12,6 +12,7 @@
 
 import Stripe from "stripe";
 import { Mppx, stripe as mppStripe } from "mppx/server";
+import { createFacilitatorConfig } from "@coinbase/x402";
 
 import {
   toolLookupCompany,
@@ -31,19 +32,39 @@ let x402Ready = false;
 
 const BASE_MAINNET_CAIP = "eip155:8453";
 
-// Asks a facilitator what it settles. Mainnet x402 runs through Coinbase's
-// CDP facilitator, which needs credentials; the open one is testnet only.
-async function facilitatorSupports(url, caipNetwork, env) {
-  try {
-    const headers = {};
-    if (env.X402_FACILITATOR_TOKEN) {
-      headers.authorization = `Bearer ${env.X402_FACILITATOR_TOKEN}`;
+// Resolves which facilitator to use. Mainnet x402 settles through Coinbase's
+// CDP facilitator, which authenticates with a signed JWT rather than a static
+// token, so the SDK builds the headers. Without CDP credentials we fall back to
+// a plain URL, which in practice only ever serves testnet.
+function resolveFacilitator(env) {
+  if (env.CDP_API_KEY_ID && env.CDP_API_KEY_SECRET) {
+    try {
+      return createFacilitatorConfig(env.CDP_API_KEY_ID, env.CDP_API_KEY_SECRET);
+    } catch (err) {
+      console.error("could not build the CDP facilitator config", err);
     }
-    const res = await fetch(`${url.replace(/\/$/, "")}/supported`, {
+  }
+  return env.X402_FACILITATOR_URL ? { url: env.X402_FACILITATOR_URL } : null;
+}
+
+// Asks a facilitator what it actually settles, so we never quote a chain it
+// cannot verify.
+async function facilitatorSupports(facilitator, caipNetwork) {
+  try {
+    const base = String(facilitator.url).replace(/\/+$/, "");
+    let headers = {};
+    if (typeof facilitator.createAuthHeaders === "function") {
+      const built = await facilitator.createAuthHeaders();
+      headers = built?.verify || built?.list || built || {};
+    }
+    const res = await fetch(`${base}/supported`, {
       headers,
-      signal: AbortSignal.timeout(8000),
+      signal: AbortSignal.timeout(9000),
     });
-    if (!res.ok) return false;
+    if (!res.ok) {
+      console.warn(`facilitator /supported returned ${res.status}`);
+      return false;
+    }
     const body = await res.json();
     return (body?.kinds || []).some((k) => k?.network === caipNetwork);
   } catch (err) {
@@ -93,13 +114,14 @@ async function getMppx(env) {
     // against it would mean an agent pays and the payment never verifies,
     // which is worse than not offering the rail at all.
     x402Ready = false;
-    if (env.BASE_DEPOSIT_ADDRESS && env.X402_FACILITATOR_URL) {
-      if (await facilitatorSupports(env.X402_FACILITATOR_URL, BASE_MAINNET_CAIP, env)) {
+    const facilitator = resolveFacilitator(env);
+    if (env.BASE_DEPOSIT_ADDRESS && facilitator) {
+      if (await facilitatorSupports(facilitator, BASE_MAINNET_CAIP)) {
         try {
           methods.push(
             factory.base.charge({
               recipient: env.BASE_DEPOSIT_ADDRESS,
-              x402: { facilitator: { url: env.X402_FACILITATOR_URL } },
+              x402: { facilitator },
             }),
           );
           x402Ready = true;
@@ -107,9 +129,7 @@ async function getMppx(env) {
           console.error("could not register the x402 Base method", err);
         }
       } else {
-        console.warn(
-          `x402 rail withheld: ${env.X402_FACILITATOR_URL} does not settle ${BASE_MAINNET_CAIP}`,
-        );
+        console.warn(`x402 rail withheld: ${facilitator.url} does not settle ${BASE_MAINNET_CAIP}`);
       }
     }
 
