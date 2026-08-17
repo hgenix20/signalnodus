@@ -148,6 +148,15 @@ async function usagePicture(env) {
        FROM usage WHERE billable = 1`,
     ).first();
 
+    // Only count payers since challenge logging began, otherwise historical
+    // test traffic makes the ratio meaningless.
+    const paidAfter = await env.BILLING.prepare(
+      `SELECT COUNT(DISTINCT subject) AS n FROM usage
+       WHERE billable = 1 AND created_at >= (
+         SELECT MIN(created_at) FROM usage WHERE tool LIKE '402:%'
+       )`,
+    ).first();
+
     const challenges = await env.BILLING.prepare(
       `SELECT COUNT(*) AS shown, COUNT(DISTINCT subject) AS visitors
        FROM usage WHERE billable = 0 AND tool LIKE '402:%'`,
@@ -156,6 +165,7 @@ async function usagePicture(env) {
     return {
       available: true,
       challengesShown: Number(challenges?.shown || 0),
+      paidAfterChallenge: Number(paidAfter?.n || 0),
       challengeVisitors: Number(challenges?.visitors || 0),
       byTool: byTool.results || [],
       daily: daily.results || [],
@@ -225,6 +235,34 @@ async function healthPicture(env) {
     ok: Boolean(env.TEMPO_DEPOSIT_ADDRESS),
     detail: env.TEMPO_DEPOSIT_ADDRESS ? "set" : "missing",
   });
+
+  // The question that decides whether anyone can pay at all. Stablecoin needs
+  // Stripe to approve the "Stablecoins and Crypto" payment method, and until
+  // they do, the only rail left is cards through a shared payment token, which
+  // very few agents can produce today.
+  if (env.STRIPE_SECRET_KEY) {
+    try {
+      const res = await fetch("https://api.stripe.com/v1/account", {
+        headers: { authorization: `Bearer ${env.STRIPE_SECRET_KEY}` },
+        signal: AbortSignal.timeout(12000),
+      });
+      const acct = await res.json();
+      const caps = acct?.capabilities || {};
+      const cryptoCap = Object.entries(caps).find(([k]) => /crypto|stablecoin/i.test(k));
+      checks.push({
+        label: "stablecoin rail",
+        ok: cryptoCap?.[1] === "active",
+        detail: cryptoCap ? `${cryptoCap[0]}: ${cryptoCap[1]}` : "not requested",
+      });
+      checks.push({
+        label: "card rail",
+        ok: caps.card_payments === "active",
+        detail: `card_payments: ${caps.card_payments || "unknown"}`,
+      });
+    } catch {
+      checks.push({ label: "stripe capabilities", ok: false, detail: "could not read" });
+    }
+  }
 
   return checks;
 }
@@ -319,7 +357,7 @@ function render({ money: m, usage, keys, health }) {
   <div class="grid">
     ${stat("Challenges shown", usage.available ? String(usage.challengesShown) : "—", "402s issued")}
     ${stat("Distinct visitors", usage.available ? String(usage.challengeVisitors) : "—", "saw a price")}
-    ${stat("Converted", usage.available ? (usage.challengesShown ? `${Math.round((usage.callers / Math.max(usage.challengeVisitors, 1)) * 100)}%` : "n/a") : "—", "visitor to payer")}
+    ${stat("Paid after a challenge", usage.available ? String(usage.paidAfterChallenge) : "—", "the number that matters")}
   </div>
 
   <h2 class="mt">Calls, last 14 days</h2>

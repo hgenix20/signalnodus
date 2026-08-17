@@ -563,16 +563,16 @@ function pricingPage() {
 
       <section>
         <h2>Prices</h2>
-        <pre class="block">lookup_company        $0.01
+        <pre class="block">lookup_company        free    proves the service works
 recent_filings        $0.01
 company_financials    $0.01
 
 filing_section        $0.05   one item extracted from a 10-K or 10-Q
 compare_filings       $0.50   the same item diffed across two filings</pre>
         <p class="sub">
-          <strong>There is no free tier.</strong> This is built for agents, and an
-          agent does not need a trial: it needs a price and a way to pay. Every
-          data call is charged. Credit never expires and there is no subscription.
+          <strong>No subscription and no minimum.</strong> <code>lookup_company</code>
+          is free so you can prove the service works before wiring payment to it.
+          Everything that does real work is priced per call. Credit never expires.
         </p>
       </section>
 
@@ -656,9 +656,10 @@ Pricing as JSON:              https://signalnodus.ai/api/pricing
 
 ## Pricing
 
-No subscription, no minimum, no free tier.
+No subscription and no minimum. One call is free so you can confirm the
+service works before wiring payment; everything that does real work is priced.
 
-- lookup_company      ${price("lookup_company")}
+- lookup_company      free (proof of life)
 - recent_filings      ${price("recent_filings")}
 - company_financials  ${price("company_financials")}
 - filing_section      ${price("filing_section")}

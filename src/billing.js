@@ -28,7 +28,12 @@ export const UNITS_PER_DOLLAR = 1000;
 // least 0.50 USD for a card payment made with a shared payment token, so
 // anything cheaper is stablecoin-only and locks out every card-paying agent.
 export const PRICING = {
-  lookup_company: 10, // $0.01
+  // Free on purpose, and not as a trial. An agent evaluating an unknown
+  // service needs one call that proves the thing works before anyone wires
+  // payment to it, and a client that cannot pay yet will otherwise drop the
+  // server after its very first request. This is the cheapest call we serve,
+  // so it costs almost nothing to leave open as proof of life.
+  lookup_company: 0,
   recent_filings: 10, // $0.01
   company_financials: 10, // $0.01
   filing_section: 50, // $0.05
