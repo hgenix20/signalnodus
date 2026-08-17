@@ -1,0 +1,26 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "ai.signalnodus/sec-filings",
+  "title": "Signal Nodus SEC Filings",
+  "description": "Read SEC 10-K and 10-Q sections as clean text and diff them year over year. Pay per call.",
+  "version": "1.0.1",
+  "websiteUrl": "https://signalnodus.ai",
+  "repository": {
+    "url": "https://github.com/hgenix20/signalnodus",
+    "source": "github"
+  },
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://mcp.signalnodus.ai/",
+      "headers": [
+        {
+          "name": "Authorization",
+          "description": "Bearer <api key> from https://signalnodus.ai/pricing. Optional: without it the server answers 402 with x402 (Base) and Stripe machine-payment options.",
+          "isRequired": false,
+          "isSecret": true
+        }
+      ]
+    }
+  ]
+}

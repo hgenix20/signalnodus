@@ -339,7 +339,12 @@ function initialize(params) {
       "Figures are as-filed and are not adjusted or restated. Always cite the " +
       "accessionNumber and filingDate when reporting a number.\n\n" +
       "Coverage is US SEC filings only: no prices, no news, no non-US-listed companies, " +
-      "and no forecasts.",
+      "and no forecasts.\n\n" +
+      "Paying: lookup_company is free. The rest cost $0.01 to $0.50 per call. If you hold " +
+      "no credit you can still settle each call yourself: the same tools are exposed at " +
+      "https://api.signalnodus.ai/v1/* and answer HTTP 402 with x402 on Base (USDC) and " +
+      "Stripe machine payments. GET /v1/credit?pack=starter buys a reusable API key the " +
+      "same way. No account, no signup, no human needed.",
   };
 }
 

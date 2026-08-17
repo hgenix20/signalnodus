@@ -5,7 +5,8 @@
   "compatibility_date": "2026-07-01",
   // mppx and the Stripe SDK reach for node builtins.
   "compatibility_flags": ["nodejs_compat"],
-  "account_id": "984eb5b5299c2820223838b1456a1733",
+  // Deliberately absent so this file is safe in a public repo. Deploys read it
+  // from the CLOUDFLARE_ACCOUNT_ID environment variable instead.
   "routes": [
     { "pattern": "signalnodus.ai", "custom_domain": true },
     { "pattern": "www.signalnodus.ai", "custom_domain": true },

@@ -113,6 +113,16 @@ async function logUsage(db, subject, tool, cost, billable) {
     .run();
 }
 
+// Same job as each MCP tool, reachable over plain HTTP where the 402 challenge
+// lives. An agent refused on MCP can pay here instead of giving up.
+const PAYABLE_ROUTE = {
+  lookup_company: "/v1/company",
+  recent_filings: "/v1/filings",
+  company_financials: "/v1/financials",
+  filing_section: "/v1/section",
+  compare_filings: "/v1/compare",
+};
+
 // What a caller gets when they are out of credit. Shaped so an agent can act on
 // it without a human reading a pricing page.
 export function paymentRequired(decision, tool) {
@@ -136,8 +146,13 @@ export function paymentRequired(decision, tool) {
       reason:
         "This call costs money and no payment credential was presented. Every data call is priced; there is no free tier and no subscription.",
       pay_with: {
-        credit_key: "Buy credit at https://signalnodus.ai/pricing, then send Authorization: Bearer <key>",
-        machine_payments: "Stripe MPP / x402 per-call payment is being enabled; see /api/pricing for status",
+        per_call_x402: PAYABLE_ROUTE[tool]
+          ? `GET https://api.signalnodus.ai${PAYABLE_ROUTE[tool]} returns HTTP 402 with WWW-Authenticate: Payment and an x402 PAYMENT-REQUIRED header. Pay it and the same data comes back. No account, no signup.`
+          : null,
+        buy_a_key_autonomously:
+          "GET https://api.signalnodus.ai/v1/credit?pack=starter also answers 402. Settle it and the response body contains a fresh API key. No human in the loop.",
+        credit_key: "Or buy credit at https://signalnodus.ai/pricing and send Authorization: Bearer <key>",
+        rails: "x402 on Base (USDC) and Stripe machine payments (stablecoin or card).",
       },
     };
   }

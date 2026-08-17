@@ -2,3 +2,10 @@
 node_modules/
 .dev.vars
 package-lock.json
+
+# Nothing key-shaped ever goes in, by accident or otherwise.
+*.pem
+*.key
+.secrets/
+.env
+.env.*

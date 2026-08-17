@@ -39,6 +39,10 @@ const SECURITY_HEADERS = {
 // their canonical URL.
 const NOINDEX = { "x-robots-tag": "noindex, nofollow" };
 
+// Ed25519 public key the MCP registry checks when we claim ai.signalnodus.
+// Private half lives off-repo; rotating it means republishing every server.
+const MCP_REGISTRY_PROOF = "v=MCPv1; k=ed25519; p=jeCPYhU5E5hoi3Ht5gFrHPbaBPPEIBEBMVG6kb6db7M=\n";
+
 export default {
   // Housekeeping runs on a schedule rather than in the request path, so no
   // caller ever pays the latency for it.
@@ -150,6 +154,11 @@ async function apexResponse(request, url, env) {
   if (url.pathname === "/llms.txt") return asset(llmsTxt(), "text/plain");
   if (url.pathname === "/agents") return asset(llmsTxt(), "text/plain");
   if (url.pathname === "/.well-known/mpp.json") return json(discoveryDoc());
+  // Proves to the official MCP registry that we own signalnodus.ai, which is
+  // what lets us publish under the ai.signalnodus namespace. Public key only.
+  if (url.pathname === "/.well-known/mcp-registry-auth") {
+    return asset(MCP_REGISTRY_PROOF, "text/plain");
+  }
   if (url.pathname === "/sitemap.xml") {
     return asset(
       `<?xml version="1.0" encoding="UTF-8"?>
