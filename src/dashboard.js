@@ -215,19 +215,49 @@ async function usagePicture(env) {
        GROUP BY day ORDER BY day`,
     ).all();
 
+    // x402 rows are money received, not prepaid credit being drawn down, so
+    // they are excluded here and reported on their own line. Adding them to
+    // "credit consumed" would double-count a payment as a liability.
     const totals = await env.BILLING.prepare(
       `SELECT COUNT(*) AS calls, SUM(cost) AS charged,
               COUNT(DISTINCT subject) AS callers
-       FROM usage WHERE billable = 1`,
+       FROM usage WHERE billable = 1 AND tool NOT LIKE 'x402:%'`,
     ).first();
 
-    // Only count payers since challenge logging began, otherwise historical
-    // test traffic makes the ratio meaningless.
+    // Someone who was shown a price and then actually paid it.
+    //
+    // The previous version counted every distinct payer since challenge
+    // logging began, without requiring that the payer had ever BEEN shown a
+    // challenge. My own credit-key testing therefore registered as a
+    // conversion, and the dashboard read "1" under the label "the number that
+    // matters" while cash collected was zero. A metric that invents a customer
+    // is worse than no metric.
+    //
+    // This now requires the same subject to appear as a challenge and then as
+    // a settled machine payment afterwards. Only the x402 path can satisfy it,
+    // because that is the only path where the payer keeps the identity they
+    // had when they were refused. Someone who sees a 402, walks to the website
+    // and buys a key is genuinely unattributable here, and is counted nowhere
+    // rather than counted wrongly.
     const paidAfter = await env.BILLING.prepare(
-      `SELECT COUNT(DISTINCT subject) AS n FROM usage
-       WHERE billable = 1 AND created_at >= (
-         SELECT MIN(created_at) FROM usage WHERE tool LIKE '402:%'
+      `SELECT COUNT(*) AS n FROM (
+         SELECT c.subject
+         FROM (SELECT subject, MIN(created_at) AS first_seen
+                 FROM usage
+                WHERE billable = 0 AND tool LIKE '402:%'
+                GROUP BY subject) c
+         JOIN usage p
+           ON p.subject = c.subject
+          AND p.billable = 1
+          AND p.tool LIKE 'x402:%'
+          AND p.created_at > c.first_seen
+         GROUP BY c.subject
        )`,
+    ).first();
+
+    const settled = await env.BILLING.prepare(
+      `SELECT COUNT(*) AS n, COALESCE(SUM(cost),0) AS amount
+       FROM usage WHERE billable = 1 AND tool LIKE 'x402:%'`,
     ).first();
 
     const challenges = await env.BILLING.prepare(
@@ -240,6 +270,8 @@ async function usagePicture(env) {
       challengesShown: Number(challenges?.shown || 0),
       paidAfterChallenge: Number(paidAfter?.n || 0),
       challengeVisitors: Number(challenges?.visitors || 0),
+      settledCount: Number(settled?.n || 0),
+      settledAmount: Number(settled?.amount || 0),
       byTool: byTool.results || [],
       daily: daily.results || [],
       calls: Number(totals?.calls || 0),
@@ -441,7 +473,8 @@ function render({ money: m, usage, keys, health }) {
   <div class="grid">
     ${stat("Challenges shown", usage.available ? String(usage.challengesShown) : "—", "402s issued")}
     ${stat("Distinct visitors", usage.available ? String(usage.challengeVisitors) : "—", "saw a price")}
-    ${stat("Paid after a challenge", usage.available ? String(usage.paidAfterChallenge) : "—", "the number that matters")}
+    ${stat("Settled machine payments", usage.available ? String(usage.settledCount) : "—", usage.available ? dollars(usage.settledAmount) + " received over x402" : "")}
+    ${stat("Paid after being refused", usage.available ? String(usage.paidAfterChallenge) : "—", "same caller, challenged then paid")}
   </div>
 
   <h2 class="mt">Calls, last 14 days</h2>

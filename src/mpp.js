@@ -263,6 +263,7 @@ export async function handleMppRoute(request, env, ctx, url) {
   try {
     const args = Object.fromEntries(url.searchParams.entries());
     const data = await route.run(args, ctx);
+    ctx?.waitUntil?.(logSettled(env, route.tool, request, price));
     return paid.withReceipt(json({ ...data, _paid: dollars(price) }));
   } catch (err) {
     // The caller has already paid, so be explicit rather than generic. A
@@ -390,5 +391,28 @@ async function logChallenge(env, tool, request) {
       .run();
   } catch (err) {
     console.error("could not log challenge", err);
+  }
+}
+
+// A machine payment that actually settled. This used to log nothing at all,
+// which meant an agent could pay us over x402 and every number on the
+// dashboard would still read zero. It is deliberately given the SAME subject
+// shape as the challenge above, because that is the only way the two events
+// can ever be joined: an unpaid caller is known by address and user agent,
+// while a credit-key caller is known by key hash, and those two identifier
+// spaces never overlap.
+async function logSettled(env, tool, request, price) {
+  if (!env?.BILLING) return;
+  const now = new Date().toISOString();
+  const ip = request.headers.get("cf-connecting-ip") || "unknown";
+  const agent = (request.headers.get("user-agent") || "none").slice(0, 80);
+  try {
+    await env.BILLING.prepare(
+      "INSERT INTO usage (subject, tool, cost, billable, day, created_at) VALUES (?, ?, ?, 1, ?, ?)",
+    )
+      .bind(`challenge:${ip}|${agent}`, `x402:${tool}`, price, now.slice(0, 10), now)
+      .run();
+  } catch (err) {
+    console.error("could not log settled payment", err);
   }
 }
