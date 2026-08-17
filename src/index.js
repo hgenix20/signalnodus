@@ -267,6 +267,11 @@ function apiResponse(request, url, env) {
         },
         // Machine payments: no account, no signup, no human. Call the route,
         // get a 402 challenge, pay, retry, get data plus a receipt.
+        buy_credit_without_a_human: {
+          route: "GET /v1/credit?pack=starter|builder|scale",
+          returns: "an API key with credit on it, usable on the MCP endpoint",
+          why: "the MCP endpoint takes a key rather than per-call payment, so this is how an agent gets one without a checkout page",
+        },
         paid_endpoints: {
           protocol: "MPP (Machine Payments Protocol) over HTTP 402, Stripe-settled",
           rails: "stablecoin from $0.01; card via shared payment token from $0.50",
@@ -646,8 +651,14 @@ Machine Payments Protocol (MPP) over HTTP 402. Call a /v1/ route, receive a
 402 with a payment challenge in the WWW-Authenticate header, pay, and retry.
 Stablecoin settles from $0.01; card via shared payment token from $0.50.
 
-Prepaid credit keys also work on the MCP endpoint: buy at
-https://signalnodus.ai/pricing and send Authorization: Bearer <key>.
+The MCP endpoint takes a prepaid key instead of per-call payment. An agent can
+buy one with a machine payment and no human involved:
+
+  GET https://api.signalnodus.ai/v1/credit?pack=starter
+
+That returns 402 with a challenge; pay and retry, and the response body
+contains the API key. Send it as Authorization: Bearer <key>. A human can buy
+the same thing at https://signalnodus.ai/pricing.
 
 ## Operator
 

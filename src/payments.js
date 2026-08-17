@@ -30,6 +30,19 @@ export function packSummary() {
   }));
 }
 
+// Mints a key and credits it in one step. Used by the machine-payment route so
+// an agent can buy access without a human ever touching a checkout page.
+export async function mintKey(env, units, label) {
+  const apiKey = newApiKey();
+  const keyHash = await hashKey(apiKey);
+  await env.BILLING.prepare(
+    "INSERT INTO api_keys (key_hash, label, credits, active, created_at) VALUES (?, ?, ?, 1, ?)",
+  )
+    .bind(keyHash, label, units, new Date().toISOString())
+    .run();
+  return apiKey;
+}
+
 function newApiKey() {
   const bytes = crypto.getRandomValues(new Uint8Array(24));
   const body = [...bytes].map((b) => b.toString(16).padStart(2, "0")).join("");

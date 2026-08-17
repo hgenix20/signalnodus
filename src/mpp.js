@@ -21,6 +21,7 @@ import {
   toolCompareFilings,
 } from "./mcp.js";
 import { priceOf, dollars, UNITS_PER_DOLLAR } from "./billing.js";
+import { PACKS, mintKey } from "./payments.js";
 
 // Stripe's stated minimum for a card payment made with a shared payment token.
 const CARD_MINIMUM_UNITS = 500; // $0.50
@@ -100,7 +101,7 @@ const ROUTES = {
 };
 
 export function isMppRoute(pathname) {
-  return Object.hasOwn(ROUTES, pathname);
+  return pathname === "/v1/credit" || Object.hasOwn(ROUTES, pathname);
 }
 
 export function describeRoutes() {
@@ -120,6 +121,8 @@ export function describeRoutes() {
 }
 
 export async function handleMppRoute(request, env, ctx, url) {
+  if (url.pathname === "/v1/credit") return handleCreditPurchase(request, env, url);
+
   const route = ROUTES[url.pathname];
   if (!route) return null;
 
@@ -180,4 +183,83 @@ function json(obj, status = 200) {
       "access-control-allow-origin": "*",
     },
   });
+}
+
+// Buy a credit key with a machine payment. This is the piece that removes the
+// last human from the loop: previously an agent could pay per call on /v1/*,
+// but to use the MCP endpoint someone had to complete a Stripe checkout page.
+// Now an agent pays here and gets a usable key back in the response.
+async function handleCreditPurchase(request, env, url) {
+  const packId = String(url.searchParams.get("pack") || "starter");
+  const pack = PACKS[packId];
+  if (!pack) {
+    return json(
+      {
+        error: "unknown_pack",
+        packs: Object.fromEntries(
+          Object.entries(PACKS).map(([id, p]) => [
+            id,
+            { price: `$${(p.cents / 100).toFixed(2)}`, credit: dollars(p.units) },
+          ]),
+        ),
+      },
+      400,
+    );
+  }
+
+  const mppx = await getMppx(env);
+  if (!mppx) {
+    return json(
+      {
+        error: "machine_payments_unavailable",
+        detail:
+          "Per-call payment is not configured yet. A human can buy the same credit at https://signalnodus.ai/pricing.",
+      },
+      503,
+    );
+  }
+
+  // Charge the pack price. Every pack clears the card floor, so both rails are
+  // offered and the caller picks whichever it can settle.
+  const units = Math.round((pack.cents / 100) * UNITS_PER_DOLLAR);
+
+  let paid;
+  try {
+    paid = await mppx.compose(...chargesFor(units))(request);
+  } catch (err) {
+    console.error("credit purchase compose failed", err);
+    return json({ error: "payment_processing_failed" }, 502);
+  }
+  if (paid.status === 402) return paid.challenge;
+
+  // Paid. Mint the key only now, so an unpaid attempt leaves nothing behind.
+  try {
+    const apiKey = await mintKey(env, pack.units, `mpp:${packId}`);
+    return paid.withReceipt(
+      json({
+        api_key: apiKey,
+        credit: dollars(pack.units),
+        pack: pack.label,
+        expires: "never",
+        use_with: {
+          mcp: "https://mcp.signalnodus.ai/",
+          header: "Authorization: Bearer <api_key>",
+          balance: "https://signalnodus.ai/api/balance",
+        },
+        note: "Save this key now. It is not stored in plaintext and cannot be shown again.",
+      }),
+    );
+  } catch (err) {
+    console.error("could not mint key after payment", err);
+    return paid.withReceipt(
+      json(
+        {
+          error: "paid_but_key_not_issued",
+          detail: "Payment succeeded but the key could not be created.",
+          refund: "Email hgenix@agentmail.to with this receipt.",
+        },
+        502,
+      ),
+    );
+  }
 }
