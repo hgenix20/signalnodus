@@ -229,13 +229,21 @@ export function diffSections(oldText, newText, { maxItems = 60 } = {}) {
   const added = [];
   const removed = [];
 
+  // Count every changed sentence. These loops used to stop at maxItems * 3,
+  // capping added and removed at exactly 180 on heavily revised filings, and
+  // unchanged and changeRatio were then derived from the truncated count. The
+  // effect was silent and backwards: the more a company rewrote its risk
+  // factors, the LOWER its reported change ratio, because every change past
+  // the 180th was counted as unchanged. Four megacaps reporting exactly 180
+  // added is what gave it away.
+  //
+  // Counting in full costs the Set lookup, which was already being paid. Only
+  // the returned passages are limited, and `truncated` already says so.
   for (const s of b) {
     if (!aSet.has(normalizeForCompare(s))) added.push(s);
-    if (added.length >= maxItems * 3) break;
   }
   for (const s of a) {
     if (!bSet.has(normalizeForCompare(s))) removed.push(s);
-    if (removed.length >= maxItems * 3) break;
   }
 
   const unchanged = b.length - added.length;
