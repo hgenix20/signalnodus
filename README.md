@@ -84,9 +84,20 @@ export CLOUDFLARE_ACCOUNT_ID=...
 npx wrangler deploy
 ```
 
-Secrets go in with `wrangler secret put` and are never committed: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `DASHBOARD_TOKEN`, and, for the x402 rail, `CDP_API_KEY_ID` and `CDP_API_KEY_SECRET`.
+Secrets go in with `wrangler secret put` and are never committed:
 
-Set `BASE_DEPOSIT_ADDRESS` in `wrangler.jsonc` to your own receiving address. The one in this repo is public by nature: it is handed to every payer inside the 402 challenge.
+| Secret | Needed for |
+|---|---|
+| `STRIPE_SECRET_KEY` | card checkout and machine payments |
+| `STRIPE_WEBHOOK_SECRET` | verifying the checkout webhook |
+| `STRIPE_PROFILE_ID` | Stripe machine payments |
+| `CDP_API_KEY_ID`, `CDP_API_KEY_SECRET` | the x402 facilitator on Base |
+| `DASHBOARD_TOKEN` | the operator dashboard at `/dashboard` |
+| `TURNSTILE_SECRET` | the human checkout page |
+
+Everything works without them, degraded rather than broken: with no Stripe or CDP credentials the `/v1/*` routes answer `503 machine_payments_unavailable` instead of a 402, and the MCP endpoint still serves prepaid keys.
+
+Set `BASE_DEPOSIT_ADDRESS` in `wrangler.jsonc` to your own receiving address, and `TEMPO_DEPOSIT_ADDRESS` if you want the stablecoin rail. The address in this repo is public by nature: it is handed to every payer inside the 402 challenge.
 
 ## Layout
 
