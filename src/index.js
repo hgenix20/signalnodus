@@ -139,6 +139,20 @@ async function apexResponse(request, url, env) {
   if (url.pathname === "/health") return json({ ok: true });
   if (url.pathname === "/site.css") return asset(BASE_CSS, "text/css");
   if (url.pathname === "/site.js") return asset(siteScript(env), "text/javascript");
+  if (url.pathname === "/llms.txt") return asset(llmsTxt(), "text/plain");
+  if (url.pathname === "/agents") return asset(llmsTxt(), "text/plain");
+  if (url.pathname === "/.well-known/mpp.json") return json(discoveryDoc());
+  if (url.pathname === "/sitemap.xml") {
+    return asset(
+      `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://signalnodus.ai/</loc></url>
+  <url><loc>https://signalnodus.ai/pricing</loc></url>
+</urlset>
+`,
+      "application/xml",
+    );
+  }
   if (url.pathname === "/robots.txt") {
     return asset("User-agent: *\nAllow: /\nSitemap: https://signalnodus.ai/\n", "text/plain");
   }
@@ -577,4 +591,105 @@ compare_filings       $0.50   the same item diffed across two filings</pre>
     </main>`,
     { canonical: "https://signalnodus.ai/pricing" },
   );
+}
+
+// Machine-readable service description. Agents and crawlers read this to work
+// out what a service does and how to pay for it, without parsing marketing
+// copy. Written in the words someone would actually search for, because that
+// is what Stripe Directory matches against.
+function llmsTxt() {
+  const price = (t) => dollars(priceOf(t));
+  return `# Signal Nodus
+
+> SEC filings API for AI agents. Extract 10-K and 10-Q sections as clean text,
+> and diff them across years. Pay per call over HTTP 402, no account and no
+> subscription.
+
+## What it does
+
+- Extract one item from a 10-K or 10-Q as clean text (risk factors, MD&A,
+  business, legal proceedings, and the rest) instead of a multi-megabyte HTML
+  document.
+- Compare the same item between two filings and get what changed: passages
+  added, passages removed, and a change ratio.
+- Pin an exact filing by accession number, so an amendment cannot move your
+  baseline between runs.
+- Look up companies, list recent filings, and read as-reported XBRL figures.
+
+Source is US SEC EDGAR, the primary record. Not a scrape of somebody's summary.
+
+## Scope
+
+US SEC filings only. No share prices, no news, no non-US-listed companies, no
+forecasts, no analyst opinion.
+
+## Endpoints
+
+MCP server (streamable HTTP): https://mcp.signalnodus.ai/
+REST, pay per call:           https://api.signalnodus.ai/v1/
+Service descriptor:           https://api.signalnodus.ai/
+Pricing as JSON:              https://signalnodus.ai/api/pricing
+
+## Pricing
+
+No subscription, no minimum, no free tier.
+
+- lookup_company      ${price("lookup_company")}
+- recent_filings      ${price("recent_filings")}
+- company_financials  ${price("company_financials")}
+- filing_section      ${price("filing_section")}
+- compare_filings     ${price("compare_filings")}
+
+## How to pay
+
+Machine Payments Protocol (MPP) over HTTP 402. Call a /v1/ route, receive a
+402 with a payment challenge in the WWW-Authenticate header, pay, and retry.
+Stablecoin settles from $0.01; card via shared payment token from $0.50.
+
+Prepaid credit keys also work on the MCP endpoint: buy at
+https://signalnodus.ai/pricing and send Authorization: Bearer <key>.
+
+## Operator
+
+Run by an autonomous AI agent, owned by a human.
+Contact: hgenix@agentmail.to
+`;
+}
+
+// Structured counterpart to llms.txt, for clients that would rather parse JSON
+// than prose.
+function discoveryDoc() {
+  const route = (path, tool, params) => ({
+    path,
+    method: "GET",
+    price: dollars(priceOf(tool)),
+    price_units_tenths_of_cent: priceOf(tool),
+    params,
+  });
+  return {
+    name: "Signal Nodus",
+    description:
+      "SEC filings API for AI agents: extract 10-K and 10-Q sections as clean text and diff them across years.",
+    source: "US SEC EDGAR",
+    scope: "US SEC filings only. No prices, news, non-US companies, or forecasts.",
+    payment: {
+      protocol: "MPP over HTTP 402",
+      settles_via: "Stripe",
+      rails: {
+        stablecoin: { minimum: "$0.01" },
+        card_shared_payment_token: { minimum: "$0.50" },
+      },
+      alternative: "prepaid credit key, Authorization: Bearer <key>",
+    },
+    mcp: { url: "https://mcp.signalnodus.ai/", transport: "streamable-http" },
+    routes: [
+      route("/v1/company", "lookup_company", "company"),
+      route("/v1/filings", "recent_filings", "company, form, limit"),
+      route("/v1/financials", "company_financials", "company, concept"),
+      route("/v1/section", "filing_section", "company, item, form, accession, max_chars"),
+      route("/v1/compare", "compare_filings", "company, item, form, from_accession, to_accession"),
+    ],
+    base_url: "https://api.signalnodus.ai",
+    contact: "hgenix@agentmail.to",
+  };
 }
