@@ -121,7 +121,7 @@ export function describeRoutes() {
 }
 
 export async function handleMppRoute(request, env, ctx, url) {
-  if (url.pathname === "/v1/credit") return handleCreditPurchase(request, env, url);
+  if (url.pathname === "/v1/credit") return handleCreditPurchase(request, env, url, ctx);
 
   const route = ROUTES[url.pathname];
   if (!route) return null;
@@ -150,7 +150,13 @@ export async function handleMppRoute(request, env, ctx, url) {
   }
 
   // No credential yet: hand back the challenge and let the agent pay.
-  if (paid.status === 402) return paid.challenge;
+  // Record it. Without this there is no way to tell "nobody found us" from
+  // "people found us, saw the price, and walked away", and those two have
+  // opposite fixes.
+  if (paid.status === 402) {
+    ctx?.waitUntil?.(logChallenge(env, route.tool, request));
+    return paid.challenge;
+  }
 
   // Paid. Do the work, and only then attach the receipt.
   try {
@@ -189,7 +195,7 @@ function json(obj, status = 200) {
 // last human from the loop: previously an agent could pay per call on /v1/*,
 // but to use the MCP endpoint someone had to complete a Stripe checkout page.
 // Now an agent pays here and gets a usable key back in the response.
-async function handleCreditPurchase(request, env, url) {
+async function handleCreditPurchase(request, env, url, ctx) {
   const packId = String(url.searchParams.get("pack") || "starter");
   const pack = PACKS[packId];
   if (!pack) {
@@ -230,7 +236,10 @@ async function handleCreditPurchase(request, env, url) {
     console.error("credit purchase compose failed", err);
     return json({ error: "payment_processing_failed" }, 502);
   }
-  if (paid.status === 402) return paid.challenge;
+  if (paid.status === 402) {
+    ctx?.waitUntil?.(logChallenge(env, "credit_purchase", request));
+    return paid.challenge;
+  }
 
   // Paid. Mint the key only now, so an unpaid attempt leaves nothing behind.
   try {
@@ -261,5 +270,24 @@ async function handleCreditPurchase(request, env, url) {
         502,
       ),
     );
+  }
+}
+
+// A payment challenge that was issued and never taken up is the single most
+// informative event this service produces right now: it means someone arrived,
+// understood the offer, and declined it.
+async function logChallenge(env, tool, request) {
+  if (!env?.BILLING) return;
+  const now = new Date().toISOString();
+  const ip = request.headers.get("cf-connecting-ip") || "unknown";
+  const agent = (request.headers.get("user-agent") || "none").slice(0, 80);
+  try {
+    await env.BILLING.prepare(
+      "INSERT INTO usage (subject, tool, cost, billable, day, created_at) VALUES (?, ?, 0, 0, ?, ?)",
+    )
+      .bind(`challenge:${ip}|${agent}`, `402:${tool}`, now.slice(0, 10), now)
+      .run();
+  } catch (err) {
+    console.error("could not log challenge", err);
   }
 }

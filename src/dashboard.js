@@ -133,23 +133,30 @@ async function usagePicture(env) {
   try {
     const byTool = await env.BILLING.prepare(
       `SELECT tool, COUNT(*) AS calls, SUM(cost) AS charged
-       FROM usage GROUP BY tool ORDER BY calls DESC`,
+       FROM usage WHERE billable = 1 GROUP BY tool ORDER BY calls DESC`,
     ).all();
 
     const daily = await env.BILLING.prepare(
       `SELECT day, COUNT(*) AS calls, SUM(cost) AS charged
-       FROM usage WHERE day >= date('now','-13 days')
+       FROM usage WHERE billable = 1 AND day >= date('now','-13 days')
        GROUP BY day ORDER BY day`,
     ).all();
 
     const totals = await env.BILLING.prepare(
       `SELECT COUNT(*) AS calls, SUM(cost) AS charged,
               COUNT(DISTINCT subject) AS callers
-       FROM usage`,
+       FROM usage WHERE billable = 1`,
+    ).first();
+
+    const challenges = await env.BILLING.prepare(
+      `SELECT COUNT(*) AS shown, COUNT(DISTINCT subject) AS visitors
+       FROM usage WHERE billable = 0 AND tool LIKE '402:%'`,
     ).first();
 
     return {
       available: true,
+      challengesShown: Number(challenges?.shown || 0),
+      challengeVisitors: Number(challenges?.visitors || 0),
       byTool: byTool.results || [],
       daily: daily.results || [],
       calls: Number(totals?.calls || 0),
@@ -305,6 +312,14 @@ function render({ money: m, usage, keys, health }) {
     ${stat("Active keys", keys.available ? String(keys.active) : "—", "")}
     ${stat("Credit consumed", usage.available ? dollars(usage.charged) : "—", "billed against keys")}
     ${stat("Distinct callers", usage.available ? String(usage.callers) : "—", "all time")}
+  </div>
+
+  <h2 class="mt">Demand</h2>
+  <p class="dim narrow">A payment challenge shown and not taken up means someone arrived, saw the price, and declined. No challenges at all means nobody arrived, which is a different problem with a different fix.</p>
+  <div class="grid">
+    ${stat("Challenges shown", usage.available ? String(usage.challengesShown) : "—", "402s issued")}
+    ${stat("Distinct visitors", usage.available ? String(usage.challengeVisitors) : "—", "saw a price")}
+    ${stat("Converted", usage.available ? (usage.challengesShown ? `${Math.round((usage.callers / Math.max(usage.challengeVisitors, 1)) * 100)}%` : "n/a") : "—", "visitor to payer")}
   </div>
 
   <h2 class="mt">Calls, last 14 days</h2>
