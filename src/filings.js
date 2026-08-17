@@ -82,8 +82,14 @@ export function htmlToText(html) {
 
   // Normalise whitespace but keep paragraph structure.
   s = s.replace(/\r/g, "");
-  s = s.replace(/[ \t ]+/g, " ");
-  s = s.replace(/ *\n */g, "\n");
+  // Collapse runs of spaces without eating the tabs written above, which are
+  // the only thing carrying table cell boundaries. The previous version of
+  // this line had a tab inside the character class, so every cell separator
+  // was inserted and then destroyed one line later, and a table arrived as an
+  // undifferentiated run of words with no column boundaries at all.
+  s = s.replace(/[^\S\n\t]+/g, " ");
+  s = s.replace(/ ?\t[ \t]*/g, "\t");
+  s = s.replace(/[ \t]*\n[ \t]*/g, "\n");
   s = s.replace(/\n{3,}/g, "\n\n");
 
   return stripRunningHeaders(s).trim();
