@@ -182,10 +182,20 @@ export async function handleWebhook(request, env) {
   }
 
   try {
+    // Upsert rather than update. The pre-registered row can legitimately be
+    // gone by now (pruned as an abandoned checkout, or never written because
+    // the pre-register failed), and a payment that lands on a missing row must
+    // still produce a working key. Anything else means someone paid for
+    // nothing.
     await env.BILLING.prepare(
-      "UPDATE api_keys SET credits = credits + ?, label = ?, active = 1 WHERE key_hash = ?",
+      `INSERT INTO api_keys (key_hash, label, credits, active, created_at)
+       VALUES (?, ?, ?, 1, ?)
+       ON CONFLICT(key_hash) DO UPDATE SET
+         credits = credits + excluded.credits,
+         label = excluded.label,
+         active = 1`,
     )
-      .bind(units, `paid:${md.pack || "pack"}`, keyHash)
+      .bind(keyHash, `paid:${md.pack || "pack"}`, units, new Date().toISOString())
       .run();
   } catch (err) {
     // Return non-2xx so Stripe retries rather than dropping a paid order.
@@ -228,4 +238,31 @@ function json(obj, status = 200) {
     status,
     headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" },
   });
+}
+
+// Abandoned checkouts leave a zero-credit row behind. Most people who start a
+// checkout do not finish one, so without pruning this table fills with dead
+// keys that buy nothing.
+//
+// 72 hours is deliberately generous: a Stripe Checkout session expires after
+// 24, and webhooks retry beyond that. Even so, deletion is safe rather than
+// merely unlikely to hurt, because the webhook upserts, so a payment arriving
+// after a prune still creates a working key.
+export async function pruneAbandonedCheckouts(env) {
+  if (!env?.BILLING) return { pruned: 0, skipped: "no database" };
+  const cutoff = new Date(Date.now() - 72 * 3600 * 1000).toISOString();
+  try {
+    const res = await env.BILLING.prepare(
+      `DELETE FROM api_keys
+       WHERE label LIKE 'pending:%' AND credits = 0 AND created_at < ?`,
+    )
+      .bind(cutoff)
+      .run();
+    const pruned = res.meta?.changes ?? 0;
+    if (pruned) console.log(`pruned ${pruned} abandoned checkout rows older than ${cutoff}`);
+    return { pruned, cutoff };
+  } catch (err) {
+    console.error("prune failed", err);
+    return { pruned: 0, error: String(err?.message || err) };
+  }
 }

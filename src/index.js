@@ -1,5 +1,5 @@
 import { handleMcp } from "./mcp.js";
-import { createCheckout, handleWebhook, keyBalance, packSummary } from "./payments.js";
+import { createCheckout, handleWebhook, keyBalance, packSummary, pruneAbandonedCheckouts } from "./payments.js";
 import { PRICING, priceOf, dollars } from "./billing.js";
 import { handleMppRoute, isMppRoute, describeRoutes } from "./mpp.js";
 
@@ -39,6 +39,12 @@ const SECURITY_HEADERS = {
 const NOINDEX = { "x-robots-tag": "noindex, nofollow" };
 
 export default {
+  // Housekeeping runs on a schedule rather than in the request path, so no
+  // caller ever pays the latency for it.
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(pruneAbandonedCheckouts(env));
+  },
+
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
     const host = url.hostname;

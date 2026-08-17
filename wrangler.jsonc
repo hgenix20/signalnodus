@@ -42,5 +42,7 @@
   // A single request should never need more than a fraction of a second; this
   // stops a pathological upstream document from burning (billable) CPU.
   "limits": { "cpu_ms": 30000 },
+  // Daily housekeeping: clear checkout rows nobody completed.
+  "triggers": { "crons": ["17 4 * * *"] },
   "observability": { "enabled": true }
 }
