@@ -712,7 +712,12 @@ function discoveryDoc() {
       protocol: "MPP over HTTP 402",
       settles_via: "Stripe",
       rails: {
-        stablecoin: { minimum: "$0.01" },
+        x402_base: {
+          network: "eip155:8453",
+          asset: "USDC",
+          note: "standard x402; no account with us required",
+        },
+        stablecoin_tempo: { minimum: "$0.01" },
         card_shared_payment_token: { minimum: "$0.50" },
       },
       alternative: "prepaid credit key, Authorization: Bearer <key>",
