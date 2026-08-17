@@ -17,7 +17,11 @@
   ],
   "vars": {
     "TURNSTILE_SITEKEY": "0x4AAAAAAEQZL0HWxzKNdU1w",
-    "CONTACT_EMAIL": "hgenix@agentmail.to"
+    "CONTACT_EMAIL": "hgenix@agentmail.to",
+    // Receiving address for x402 on Base, issued by Stripe. Public by nature:
+    // it is handed to every payer inside the 402 challenge.
+    "BASE_DEPOSIT_ADDRESS": "0xcf7682647d17803f997308a10c191557d899ec30",
+    "X402_FACILITATOR_URL": "https://x402.org/facilitator"
   },
   // The MCP endpoint is unauthenticated and every miss becomes one request
   // against SEC, who rate limit at 10 req/s and block by User-Agent. This caps

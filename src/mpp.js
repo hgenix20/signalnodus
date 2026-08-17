@@ -27,6 +27,34 @@ import { PACKS, mintKey } from "./payments.js";
 const CARD_MINIMUM_UNITS = 500; // $0.50
 
 let cached = null;
+let x402Ready = false;
+
+const BASE_MAINNET_CAIP = "eip155:8453";
+
+// Asks a facilitator what it settles. Mainnet x402 runs through Coinbase's
+// CDP facilitator, which needs credentials; the open one is testnet only.
+async function facilitatorSupports(url, caipNetwork, env) {
+  try {
+    const headers = {};
+    if (env.X402_FACILITATOR_TOKEN) {
+      headers.authorization = `Bearer ${env.X402_FACILITATOR_TOKEN}`;
+    }
+    const res = await fetch(`${url.replace(/\/$/, "")}/supported`, {
+      headers,
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!res.ok) return false;
+    const body = await res.json();
+    return (body?.kinds || []).some((k) => k?.network === caipNetwork);
+  } catch (err) {
+    console.error("facilitator capability check failed", err);
+    return false;
+  }
+}
+
+export function x402Status() {
+  return x402Ready;
+}
 
 // Built once per isolate. Returns null until the operator has supplied the
 // Stripe credentials, which keeps the rest of the Worker serving normally
@@ -41,16 +69,49 @@ async function getMppx(env) {
 
   try {
     const client = new Stripe(env.STRIPE_SECRET_KEY);
-    const methods = mppStripe
-      .create({
-        client,
-        networkId: env.STRIPE_PROFILE_ID,
-        livemode: !env.STRIPE_SECRET_KEY.includes("_test_"),
-        ...(env.TEMPO_DEPOSIT_ADDRESS
-          ? { depositAddresses: { tempo: env.TEMPO_DEPOSIT_ADDRESS } }
-          : {}),
-      })
-      .defaultMethods();
+    const deposits = {};
+    if (env.TEMPO_DEPOSIT_ADDRESS) deposits.tempo = env.TEMPO_DEPOSIT_ADDRESS;
+    if (env.BASE_DEPOSIT_ADDRESS) deposits.base = env.BASE_DEPOSIT_ADDRESS;
+
+    const factory = mppStripe.create({
+      client,
+      networkId: env.STRIPE_PROFILE_ID,
+      livemode: !env.STRIPE_SECRET_KEY.includes("_test_"),
+      ...(Object.keys(deposits).length ? { depositAddresses: deposits } : {}),
+    });
+
+    const methods = factory.defaultMethods();
+
+    // x402 on Base, added on top of Stripe's defaults. This is the rail most
+    // agents in the wild actually speak, and defaultMethods() does not include
+    // it, because settlement runs through an x402 facilitator rather than
+    // Stripe.
+    //
+    // The rail is only offered if the configured facilitator actually settles
+    // the chain we are quoting. The public facilitator serves Base Sepolia
+    // (84532) while we charge on Base mainnet (8453); advertising a challenge
+    // against it would mean an agent pays and the payment never verifies,
+    // which is worse than not offering the rail at all.
+    x402Ready = false;
+    if (env.BASE_DEPOSIT_ADDRESS && env.X402_FACILITATOR_URL) {
+      if (await facilitatorSupports(env.X402_FACILITATOR_URL, BASE_MAINNET_CAIP, env)) {
+        try {
+          methods.push(
+            factory.base.charge({
+              recipient: env.BASE_DEPOSIT_ADDRESS,
+              x402: { facilitator: { url: env.X402_FACILITATOR_URL } },
+            }),
+          );
+          x402Ready = true;
+        } catch (err) {
+          console.error("could not register the x402 Base method", err);
+        }
+      } else {
+        console.warn(
+          `x402 rail withheld: ${env.X402_FACILITATOR_URL} does not settle ${BASE_MAINNET_CAIP}`,
+        );
+      }
+    }
 
     cached = Mppx.create({
       methods,
@@ -84,10 +145,19 @@ function amountString(units) {
 
 // Which challenges to offer for a given price. Below the card floor only the
 // stablecoin rail can actually settle.
-function chargesFor(units) {
-  const charges = [["tempo/charge", { amount: amountString(units) }]];
+function chargesFor(units, env) {
+  const amount = amountString(units);
+  const charges = [["tempo/charge", { amount }]];
+
+  // x402 on Base, offered only when the facilitator can actually settle it.
+  // Listed early because a client that speaks x402 and finds no x402 option
+  // simply leaves.
+  if (x402Ready) {
+    charges.push(["evm/charge", { amount }]);
+  }
+
   if (units >= CARD_MINIMUM_UNITS) {
-    charges.push(["stripe/charge", { amount: amountString(units) }]);
+    charges.push(["stripe/charge", { amount }]);
   }
   return charges;
 }
@@ -108,7 +178,9 @@ export function describeRoutes() {
   return Object.entries(ROUTES).map(([path, r]) => ({
     path,
     price: dollars(priceOf(r.tool)),
-    rails: priceOf(r.tool) >= CARD_MINIMUM_UNITS ? ["stablecoin", "card"] : ["stablecoin"],
+    rails: priceOf(r.tool) >= CARD_MINIMUM_UNITS
+      ? ["stablecoin-tempo", "x402-base", "card"]
+      : ["stablecoin-tempo", "x402-base"],
     params:
       path === "/v1/compare"
         ? "company, item, form, from_accession, to_accession"
@@ -143,7 +215,7 @@ export async function handleMppRoute(request, env, ctx, url) {
 
   let paid;
   try {
-    paid = await mppx.compose(...chargesFor(price))(request);
+    paid = await mppx.compose(...chargesFor(price, env))(request);
   } catch (err) {
     console.error("mpp compose failed", err);
     return json({ error: "payment_processing_failed" }, 502);
@@ -231,7 +303,7 @@ async function handleCreditPurchase(request, env, url, ctx) {
 
   let paid;
   try {
-    paid = await mppx.compose(...chargesFor(units))(request);
+    paid = await mppx.compose(...chargesFor(units, env))(request);
   } catch (err) {
     console.error("credit purchase compose failed", err);
     return json({ error: "payment_processing_failed" }, 502);

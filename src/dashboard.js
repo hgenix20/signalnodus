@@ -9,11 +9,16 @@
 // rather than 401 when unauthenticated, so its existence is not advertised.
 
 import { dollars, PRICING, priceOf } from "./billing.js";
+import { x402Status } from "./mpp.js";
 
 const COOKIE = "sn_dash";
 
 export function isDashboardPath(pathname) {
-  return pathname === "/dashboard" || pathname === "/dashboard/logout";
+  return (
+    pathname === "/dashboard" ||
+    pathname === "/dashboard/logout" ||
+    pathname === "/dashboard/deposit-address"
+  );
 }
 
 function cookieValue(request, name) {
@@ -62,6 +67,32 @@ export async function handleDashboard(request, env, url) {
   }
 
   if (!sameToken(cookieValue(request, COOKIE), token)) return notFound();
+
+  // Operator action: ask Stripe for an on-chain deposit address. Kept behind
+  // the dashboard token because it touches the Stripe account, and read-only
+  // in effect since Stripe returns the existing address if one exists.
+  if (url.pathname === "/dashboard/deposit-address") {
+    const network = (url.searchParams.get("network") || "base").toLowerCase();
+    if (!/^[a-z]{2,20}$/.test(network)) {
+      return Response.json({ error: "bad network" }, { status: 400 });
+    }
+    try {
+      const res = await fetch("https://api.stripe.com/v1/crypto/deposit_addresses", {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${env.STRIPE_SECRET_KEY}`,
+          "stripe-version": "2026-05-27.preview",
+          "content-type": "application/x-www-form-urlencoded",
+        },
+        body: new URLSearchParams({ network }),
+        signal: AbortSignal.timeout(15000),
+      });
+      const body = await res.json();
+      return Response.json({ status: res.status, network, body }, { headers: { "cache-control": "no-store" } });
+    } catch (err) {
+      return Response.json({ error: String(err?.message || err) }, { status: 502 });
+    }
+  }
 
   const [money, usage, keys, health] = await Promise.all([
     stripePicture(env),
@@ -228,6 +259,16 @@ async function healthPicture(env) {
     label: "machine payments",
     ok: Boolean(env.STRIPE_SECRET_KEY && env.STRIPE_PROFILE_ID),
     detail: env.STRIPE_SECRET_KEY && env.STRIPE_PROFILE_ID ? "configured" : "not configured",
+  });
+
+  checks.push({
+    label: "x402 base rail",
+    ok: x402Status(),
+    detail: x402Status()
+      ? "live"
+      : env.BASE_DEPOSIT_ADDRESS
+        ? "withheld: facilitator does not settle Base mainnet"
+        : "no deposit address",
   });
 
   checks.push({
