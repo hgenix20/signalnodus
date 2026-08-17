@@ -17,7 +17,8 @@ export function isDashboardPath(pathname) {
   return (
     pathname === "/dashboard" ||
     pathname === "/dashboard/logout" ||
-    pathname === "/dashboard/deposit-address"
+    pathname === "/dashboard/deposit-address" ||
+    pathname === "/dashboard/x402-check"
   );
 }
 
@@ -92,6 +93,47 @@ export async function handleDashboard(request, env, url) {
     } catch (err) {
       return Response.json({ error: String(err?.message || err) }, { status: 502 });
     }
+  }
+
+  // Diagnostic: why is the x402 rail not being offered? Reports the shape of
+  // what CDP returns without ever echoing a credential.
+  if (url.pathname === "/dashboard/x402-check") {
+    const out = { hasKeyId: Boolean(env.CDP_API_KEY_ID), hasSecret: Boolean(env.CDP_API_KEY_SECRET) };
+    try {
+      const { createFacilitatorConfig } = await import("@coinbase/x402");
+      const f = createFacilitatorConfig(env.CDP_API_KEY_ID, env.CDP_API_KEY_SECRET);
+      out.url = f.url;
+      out.hasAuthHook = typeof f.createAuthHeaders === "function";
+
+      let built = null;
+      try {
+        built = await f.createAuthHeaders();
+        out.authShape = built && typeof built === "object" ? Object.keys(built) : typeof built;
+        const first = built?.verify || built?.list || built;
+        out.headerNames = first && typeof first === "object" ? Object.keys(first) : null;
+      } catch (e) {
+        out.authError = String(e?.message || e).slice(0, 200);
+      }
+
+      for (const [label, headers] of [
+        ["with-supported-headers", built?.supported || {}],
+        ["with-verify-headers", built?.verify || {}],
+      ]) {
+        try {
+          const res = await fetch(`${String(f.url).replace(/\/+$/, "")}/supported`, {
+            headers: headers && typeof headers === "object" ? headers : {},
+            signal: AbortSignal.timeout(10000),
+          });
+          const text = await res.text();
+          out[label] = { status: res.status, body: text.slice(0, 300) };
+        } catch (e) {
+          out[label] = { error: String(e?.message || e).slice(0, 160) };
+        }
+      }
+    } catch (e) {
+      out.fatal = String(e?.message || e).slice(0, 250);
+    }
+    return Response.json(out, { headers: { "cache-control": "no-store" } });
   }
 
   const [money, usage, keys, health] = await Promise.all([
@@ -261,11 +303,12 @@ async function healthPicture(env) {
     detail: env.STRIPE_SECRET_KEY && env.STRIPE_PROFILE_ID ? "configured" : "not configured",
   });
 
+  const x402Live = await x402Status(env);
   checks.push({
     label: "x402 base rail",
-    ok: x402Status(),
-    detail: x402Status()
-      ? "live"
+    ok: x402Live,
+    detail: x402Live
+      ? "live on Base mainnet"
       : env.BASE_DEPOSIT_ADDRESS
         ? "withheld: facilitator does not settle Base mainnet"
         : "no deposit address",

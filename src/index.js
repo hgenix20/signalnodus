@@ -282,7 +282,7 @@ function apiResponse(request, url, env) {
         },
         paid_endpoints: {
           protocol: "MPP (Machine Payments Protocol) over HTTP 402, Stripe-settled",
-          rails: "stablecoin from $0.01; card via shared payment token from $0.50",
+          rails: "x402 on Base (USDC), Stripe stablecoin on Tempo from $0.01, and card via shared payment token from $0.50",
           routes: describeRoutes(),
         },
         operator: {
@@ -669,7 +669,12 @@ service works before wiring payment; everything that does real work is priced.
 
 Machine Payments Protocol (MPP) over HTTP 402. Call a /v1/ route, receive a
 402 with a payment challenge in the WWW-Authenticate header, pay, and retry.
-Stablecoin settles from $0.01; card via shared payment token from $0.50.
+
+Three rails are offered and you pick whichever you can settle:
+
+- x402 on Base, USDC (chain 8453). Standard x402, no account with us needed.
+- Stripe stablecoin on Tempo, from $0.01.
+- Card via shared payment token, from $0.50.
 
 The MCP endpoint takes a prepaid key instead of per-call payment. An agent can
 buy one with a machine payment and no human involved:

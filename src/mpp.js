@@ -30,7 +30,10 @@ const CARD_MINIMUM_UNITS = 500; // $0.50
 let cached = null;
 let x402Ready = false;
 
-const BASE_MAINNET_CAIP = "eip155:8453";
+// Facilitators disagree on how to name a chain: the open one answers in CAIP
+// ("eip155:8453"), CDP answers with the short name ("base"). Accept either
+// rather than silently withholding the rail over a naming convention.
+const BASE_MAINNET_IDS = new Set(["eip155:8453", "base", "8453"]);
 
 // Resolves which facilitator to use. Mainnet x402 settles through Coinbase's
 // CDP facilitator, which authenticates with a signed JWT rather than a static
@@ -49,13 +52,15 @@ function resolveFacilitator(env) {
 
 // Asks a facilitator what it actually settles, so we never quote a chain it
 // cannot verify.
-async function facilitatorSupports(facilitator, caipNetwork) {
+async function facilitatorSupports(facilitator, acceptedNetworks) {
   try {
     const base = String(facilitator.url).replace(/\/+$/, "");
+    // CDP signs a separate JWT per endpoint, so the headers for /supported are
+    // not the headers for /verify. Using the wrong set returns 401.
     let headers = {};
     if (typeof facilitator.createAuthHeaders === "function") {
       const built = await facilitator.createAuthHeaders();
-      headers = built?.verify || built?.list || built || {};
+      headers = built?.supported || built?.list || built?.verify || {};
     }
     const res = await fetch(`${base}/supported`, {
       headers,
@@ -66,14 +71,18 @@ async function facilitatorSupports(facilitator, caipNetwork) {
       return false;
     }
     const body = await res.json();
-    return (body?.kinds || []).some((k) => k?.network === caipNetwork);
+    return (body?.kinds || []).some((k) => acceptedNetworks.has(String(k?.network)));
   } catch (err) {
     console.error("facilitator capability check failed", err);
     return false;
   }
 }
 
-export function x402Status() {
+// Must actually run initialisation rather than read the flag: the dashboard
+// renders in isolates that may never have served a payment route, where the
+// flag is still false and would report a healthy rail as withheld.
+export async function x402Status(env) {
+  await getMppx(env);
   return x402Ready;
 }
 
@@ -116,7 +125,7 @@ async function getMppx(env) {
     x402Ready = false;
     const facilitator = resolveFacilitator(env);
     if (env.BASE_DEPOSIT_ADDRESS && facilitator) {
-      if (await facilitatorSupports(facilitator, BASE_MAINNET_CAIP)) {
+      if (await facilitatorSupports(facilitator, BASE_MAINNET_IDS)) {
         try {
           methods.push(
             factory.base.charge({
@@ -129,7 +138,7 @@ async function getMppx(env) {
           console.error("could not register the x402 Base method", err);
         }
       } else {
-        console.warn(`x402 rail withheld: ${facilitator.url} does not settle ${BASE_MAINNET_CAIP}`);
+        console.warn(`x402 rail withheld: ${facilitator.url} does not settle Base mainnet`);
       }
     }
 
