@@ -2,6 +2,7 @@ import { handleMcp } from "./mcp.js";
 import { createCheckout, handleWebhook, keyBalance, packSummary, pruneAbandonedCheckouts } from "./payments.js";
 import { PRICING, priceOf, dollars } from "./billing.js";
 import { handleMppRoute, isMppRoute, describeRoutes } from "./mpp.js";
+import { handleDashboard, isDashboardPath } from "./dashboard.js";
 
 // Signal Nodus — one Worker serving all signalnodus.ai hosts.
 // Canonical host: signalnodus.ai (www 301s here; .com redirects at the zone edge).
@@ -142,6 +143,7 @@ async function apexResponse(request, url, env) {
   }
   if (url.pathname === "/pricing") return html(pricingPage());
 
+  if (isDashboardPath(url.pathname)) return handleDashboard(request, env, url);
   if (url.pathname === "/health") return json({ ok: true });
   if (url.pathname === "/site.css") return asset(BASE_CSS, "text/css");
   if (url.pathname === "/site.js") return asset(siteScript(env), "text/javascript");
@@ -392,6 +394,17 @@ const BASE_CSS = `
   .sub { margin-top: 14px; color: var(--dim); max-width: 58ch; }
   h2 { font-size: 20px; margin-bottom: 14px; }
   .ok { color: var(--accent); }
+  h2 { font-size: 17px; margin-top: 34px; margin-bottom: 6px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-top: 12px; }
+  .stat { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; }
+  .stat-l { color: var(--dim); font-size: 12px; text-transform: uppercase; letter-spacing: .06em; }
+  .stat-v { font-size: 24px; margin-top: 4px; font-weight: 600; }
+  .stat-n { color: var(--dim); font-size: 12px; margin-top: 2px; }
+  .num { text-align: right; font-variant-numeric: tabular-nums; }
+  .warn { color: #f7b955; }
+  .pill { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 13px; border: 1px solid var(--line); }
+  .pill.ok { color: var(--accent); border-color: #24503f; }
+  .pill.bad { color: #ff6b6b; border-color: #5a2a2a; }
   table.packs { border-collapse: collapse; margin-top: 8px; }
   table.packs th, table.packs td { text-align: left; padding: 8px 22px 8px 0; border-bottom: 1px solid var(--line); }
   table.packs th { color: var(--dim); font-weight: 600; font-size: 14px; }
