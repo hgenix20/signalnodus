@@ -538,16 +538,25 @@ function landingPage() {
 
   <section id="mcp">
     <h2>Working today: the MCP server</h2>
-    <pre class="block">https://mcp.signalnodus.ai/   <span class="dim"># streamable-http, no key, no signup</span></pre>
+    <pre class="block">https://mcp.signalnodus.ai/   <span class="dim"># streamable-http; lookup is free, no signup</span></pre>
     <p class="sub">
-      Three tools over US SEC EDGAR: <code>lookup_company</code>,
-      <code>recent_filings</code>, and <code>company_financials</code>. Canonical
-      filings and as-reported XBRL figures, each tied to the filing it came from.
+      Five tools over US SEC EDGAR: <code>lookup_company</code> (free),
+      <code>recent_filings</code>, <code>company_financials</code>,
+      <code>filing_section</code>, and <code>compare_filings</code>. Clean section
+      text and sentence-level year-over-year diffs, every result pinned to the
+      accession number it came from, so an amendment can never quietly move a
+      baseline you already computed.
     </p>
     <p class="sub">
       Scope, stated plainly: SEC filings only. <strong>No</strong> prices, news,
-      non-US-listed companies, or forecasts. Every call is priced, from $0.01,
-      and it is <span class="ok">preview</span> quality.
+      non-US-listed companies, or forecasts. Every data call is priced, from
+      $0.01, payable per call over x402 on Base or with a prepaid key.
+      <a href="/pricing">Pricing</a>.
+    </p>
+    <p class="sub">
+      What the tools find when pointed at real filings:
+      <a href="/research">research</a>, every number reproducible against the
+      SEC's own documents.
     </p>
   </section>
 
