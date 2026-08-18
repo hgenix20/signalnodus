@@ -154,6 +154,12 @@ async function apexResponse(request, url, env) {
   if (url.pathname === "/llms.txt") return asset(llmsTxt(), "text/plain");
   if (url.pathname === "/agents") return asset(llmsTxt(), "text/plain");
   if (url.pathname === "/.well-known/mpp.json") return json(discoveryDoc());
+  // Machine-readable, LLM-free. A directory that has to ask a model whether we
+  // speak MCP will get it wrong when its model is down, which is exactly what
+  // happened: our public agent-readiness card read "MCP Support: No" while the
+  // MCP server was serving traffic.
+  if (url.pathname === "/.well-known/mcp.json") return json(mcpDescriptor());
+  if (url.pathname === "/openapi.json") return json(openApiDoc());
   // Proves to the official MCP registry that we own signalnodus.ai, which is
   // what lets us publish under the ai.signalnodus namespace. Public key only.
   if (url.pathname === "/.well-known/mcp-registry-auth") {
@@ -741,5 +747,122 @@ function discoveryDoc() {
     ],
     base_url: "https://api.signalnodus.ai",
     contact: "hgenix@agentmail.to",
+  };
+}
+
+// ------------------------------------------------------- machine discovery
+
+function mcpDescriptor() {
+  return {
+    name: "signalnodus",
+    version: "0.3.0",
+    description:
+      "SEC filing extraction over MCP. Pinned 10-K and 10-Q section text and " +
+      "sentence-level year-over-year diffs, from the primary SEC record.",
+    homepage: "https://signalnodus.ai",
+    openapi: "https://signalnodus.ai/openapi.json",
+    transports: [{ type: "streamable-http", url: "https://mcp.signalnodus.ai/" }],
+    capabilities: [
+      "lookup_company",
+      "recent_filings",
+      "company_financials",
+      "filing_section",
+      "compare_filings",
+    ],
+    payment: {
+      protocols: ["x402", "mpp"],
+      networks: ["eip155:8453"],
+      assets: ["USDC"],
+      per_call: true,
+      subscription: false,
+      account_required: false,
+      // The claim that matters to an agent: it can get a credential without a
+      // human, because paying IS the registration.
+      autonomous_credential: "https://api.signalnodus.ai/v1/credit?pack=starter",
+    },
+    contact_email: "hgenix@agentmail.to",
+  };
+}
+
+function priced(tool) {
+  const p = priceOf(tool);
+  return p === 0 ? "free" : dollars(p);
+}
+
+function q(name, desc, required = false) {
+  return { name, in: "query", required, schema: { type: "string" }, description: desc };
+}
+
+function openApiDoc() {
+  const paid = {
+    description:
+      "Payment required. Carries WWW-Authenticate: Payment and an x402 " +
+      "PAYMENT-REQUIRED header. Settle it and repeat the request.",
+    content: { "application/problem+json": { schema: { type: "object" } } },
+  };
+  const ok = { description: "Success", content: { "application/json": { schema: { type: "object" } } } };
+  const path = (tool, summary, params) => ({
+    get: {
+      summary,
+      description: `${summary} Costs ${priced(tool)} per call. No account and no subscription.`,
+      parameters: params,
+      responses: { 200: ok, 402: paid },
+    },
+  });
+
+  return {
+    openapi: "3.1.0",
+    info: {
+      title: "Signal Nodus",
+      version: "0.3.0",
+      description:
+        "SEC filing extraction, priced per call. Every route answers HTTP 402 " +
+        "with an x402 challenge when no payment is presented; there is no " +
+        "signup step to fail at, because settling the challenge issues the " +
+        "credential. An MCP server over streamable HTTP is at " +
+        "https://mcp.signalnodus.ai/ .",
+      contact: { email: "hgenix@agentmail.to" },
+      license: { name: "Data from US SEC EDGAR, a public primary source" },
+    },
+    servers: [{ url: "https://api.signalnodus.ai" }],
+    paths: {
+      "/v1/company": path("lookup_company", "Resolve a ticker or name to a CIK and metadata.", [
+        q("company", "Ticker or company name.", true),
+      ]),
+      "/v1/filings": path("recent_filings", "List recent filings with accession numbers.", [
+        q("company", "Ticker or company name.", true),
+        q("form", "Form type, for example 10-K."),
+        q("limit", "Maximum filings to return."),
+      ]),
+      "/v1/financials": path("company_financials", "As-reported XBRL facts for one concept.", [
+        q("company", "Ticker or company name.", true),
+        q("concept", "XBRL concept, for example Assets.", true),
+      ]),
+      "/v1/section": path("filing_section", "One item from a filing as clean text.", [
+        q("company", "Ticker or company name.", true),
+        q("item", "Item identifier, for example 1A.", true),
+        q("form", "Form type, for example 10-K."),
+        q("accession", "Pin an exact filing so an amendment cannot move the baseline."),
+        q("max_chars", "Truncate the returned text."),
+      ]),
+      "/v1/compare": path("compare_filings", "Sentence-level diff of one item across two filings.", [
+        q("company", "Ticker or company name.", true),
+        q("item", "Item identifier, for example 1A.", true),
+        q("form", "Form type, for example 10-K."),
+        q("from_accession", "Older filing to compare from."),
+        q("to_accession", "Newer filing to compare to."),
+      ]),
+      "/v1/credit": {
+        get: {
+          summary: "Buy a reusable API key with a machine payment.",
+          description:
+            "Answers 402. Settle the challenge and the response body contains a " +
+            "working API key. This is the whole registration flow: there is no " +
+            "email, no confirmation link, no CAPTCHA, and no human.",
+          parameters: [q("pack", "starter, builder, or scale.")],
+          responses: { 200: ok, 402: paid },
+        },
+      },
+    },
   };
 }
