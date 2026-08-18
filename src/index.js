@@ -154,6 +154,9 @@ async function apexResponse(request, url, env) {
 
   if (isDashboardPath(url.pathname)) return handleDashboard(request, env, url);
   if (url.pathname === "/health") return json({ ok: true });
+  // IndexNow ownership proof: search engines fetch this to confirm the ping
+  // for our URLs came from us. Public by design.
+  if (url.pathname === "/075d985daf8bb3f220089899bfd6820b.txt") return asset("075d985daf8bb3f220089899bfd6820b", "text/plain");
   if (url.pathname === "/site.css") return asset(BASE_CSS, "text/css");
   if (url.pathname === "/site.js") return asset(siteScript(env), "text/javascript");
   if (url.pathname === "/llms.txt") return asset(llmsTxt(), "text/plain");
