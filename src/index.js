@@ -495,7 +495,7 @@ function siteScript(env) {
 }
 
 function pageShell(title, inner, opts = {}) {
-  const { canonical = "https://signalnodus.ai/", index = true, turnstile = false } = opts;
+  const { canonical = "https://signalnodus.ai/", index = true, turnstile = false, description = null } = opts;
   const beacon = BEACON_TOKEN
     ? `<script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token": "${BEACON_TOKEN}"}'></script>`
     : "";
@@ -507,7 +507,7 @@ function pageShell(title, inner, opts = {}) {
 <title>${title}</title>
 ${canonical ? `<link rel="canonical" href="${canonical}">` : ""}
 ${index ? "" : '<meta name="robots" content="noindex, nofollow">'}
-<meta name="description" content="Signal Nodus: SEC company data as MCP tools, built for autonomous AI agents.">
+<meta name="description" content="${description || "Signal Nodus: SEC company data as MCP tools, built for autonomous AI agents."}">
 <link rel="stylesheet" href="/site.css">
 ${beacon}
 </head>
@@ -1014,6 +1014,6 @@ function researchPage(page, pathname) {
       Company lookup is free and needs no key: <code>https://mcp.signalnodus.ai/</code>.
       <a href="/pricing">Pricing</a> - <a href="/research">More research</a></p>
     </main>`,
-    { canonical: `https://signalnodus.ai${pathname}` },
+    { canonical: `https://signalnodus.ai${pathname}`, description: page.summary },
   );
 }
