@@ -191,6 +191,73 @@ function chargesFor(units, env) {
   return charges;
 }
 
+// What each route looks like to a shopper. CDP's Bazaar (the discovery index
+// agents query for payable x402 endpoints) lists resources by the `bazaar`
+// extension found in their PAYMENT-REQUIRED payload: an input/output example
+// pair, so an agent knows what it is buying before it pays. mppx verification
+// only requires that its own extension key survive untouched, so adding a
+// sibling key is safe: containsExtensions checks the mppx entry and ignores
+// the rest.
+const BAZAAR_INFO = {
+  "/v1/company": {
+    q: { company: "NVDA" },
+    out: { name: "NVIDIA CORP", cik: "0001045810", tickers: ["NVDA"], exchanges: ["Nasdaq"] },
+  },
+  "/v1/filings": {
+    q: { company: "NVDA", form: "10-K", limit: "2" },
+    out: { returned: 2, filings: [{ form: "10-K", filingDate: "2026-02-25", accessionNumber: "0001045810-26-000021" }] },
+  },
+  "/v1/financials": {
+    q: { company: "NVDA", concept: "Assets" },
+    out: { concept: "Assets", unit: "USD", returned: 40, facts: [{ end: "2026-01-25", val: 111601000000 }] },
+  },
+  "/v1/section": {
+    q: { company: "NVDA", item: "1A", form: "10-K", max_chars: "3000" },
+    out: { item: "1A", characters: 3000, pinned: false, text: "Item 1A. Risk Factors ..." },
+  },
+  "/v1/compare": {
+    q: { company: "NVDA", item: "1A" },
+    out: { summary: { added: 161, removed: 141, unchanged: 335, changeRatio: 0.325 }, added: ["..."], removed: ["..."] },
+  },
+  "/v1/credit": {
+    q: { pack: "starter" },
+    out: { api_key: "sn_live_...", credit: "$10.00", note: "settling the 402 IS the registration; no account exists" },
+  },
+};
+
+// Rewrites the PAYMENT-REQUIRED header on an outgoing 402 so the payload
+// carries the bazaar extension next to mppx's. Anything malformed passes
+// through untouched: a challenge that settles beats one that markets.
+function withBazaar(challengeResponse, pathname) {
+  const info = BAZAAR_INFO[pathname];
+  const raw = challengeResponse?.headers?.get?.("PAYMENT-REQUIRED");
+  if (!info || !raw) return challengeResponse;
+  try {
+    // mppx emits unpadded base64 and atob refuses it, so pad for decode and
+    // strip the padding again after encode to hand back the same dialect.
+    const pad = raw + "=".repeat((4 - (raw.length % 4)) % 4);
+    const payload = JSON.parse(atob(pad));
+    payload.extensions = {
+      ...(payload.extensions || {}),
+      bazaar: {
+        info: {
+          input: { type: "http", method: "GET", queryParams: info.q },
+          output: { type: "json", example: info.out },
+        },
+      },
+    };
+    const headers = new Headers(challengeResponse.headers);
+    headers.set("PAYMENT-REQUIRED", btoa(JSON.stringify(payload)).replace(/=+$/, ""));
+    return new Response(challengeResponse.body, {
+      status: challengeResponse.status,
+      headers,
+    });
+  } catch (err) {
+    console.error("bazaar enrichment failed; serving the plain challenge", err);
+    return challengeResponse;
+  }
+}
+
 const ROUTES = {
   "/v1/company": { tool: "lookup_company", run: toolLookupCompany },
   "/v1/filings": { tool: "recent_filings", run: toolRecentFilings },
@@ -256,7 +323,7 @@ export async function handleMppRoute(request, env, ctx, url) {
   // opposite fixes.
   if (paid.status === 402) {
     ctx?.waitUntil?.(logChallenge(env, route.tool, request));
-    return paid.challenge;
+    return withBazaar(paid.challenge, url.pathname);
   }
 
   // Paid. Do the work, and only then attach the receipt.
@@ -340,7 +407,7 @@ async function handleCreditPurchase(request, env, url, ctx) {
   }
   if (paid.status === 402) {
     ctx?.waitUntil?.(logChallenge(env, "credit_purchase", request));
-    return paid.challenge;
+    return withBazaar(paid.challenge, "/v1/credit");
   }
 
   // Paid. Mint the key only now, so an unpaid attempt leaves nothing behind.
