@@ -146,6 +146,11 @@ async function apexResponse(request, url, env) {
     );
   }
   if (url.pathname === "/pricing") return html(pricingPage());
+  if (url.pathname === "/research") return html(researchIndex());
+  if (url.pathname.startsWith("/research/")) {
+    const page = RESEARCH[url.pathname.slice("/research/".length)];
+    if (page) return html(researchPage(page, url.pathname));
+  }
 
   if (isDashboardPath(url.pathname)) return handleDashboard(request, env, url);
   if (url.pathname === "/health") return json({ ok: true });
@@ -171,6 +176,8 @@ async function apexResponse(request, url, env) {
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url><loc>https://signalnodus.ai/</loc></url>
   <url><loc>https://signalnodus.ai/pricing</loc></url>
+  <url><loc>https://signalnodus.ai/research</loc></url>
+${Object.keys(RESEARCH).map((k) => `  <url><loc>https://signalnodus.ai/research/${k}</loc></url>`).join("\n")}
 </urlset>
 `,
       "application/xml",
@@ -376,6 +383,13 @@ function placeholder(name, note) {
 }
 
 const BASE_CSS = `
+/* research pages */
+.narrowread{max-width:46rem}
+.narrowread table{border-collapse:collapse;margin:1rem 0;width:100%}
+.narrowread th,.narrowread td{border:1px solid var(--line,#2a2a2a);padding:.4rem .7rem;text-align:left}
+ul.research{list-style:none;padding:0}
+ul.research li{margin:0 0 1rem 0}
+
   :root {
     --bg: #0b0e14; --panel: #11151f; --line: #1f2534;
     --text: #d7dce6; --dim: #8a93a6; --accent: #4fd1a5; --accent2: #7aa2f7;
@@ -865,4 +879,138 @@ function openApiDoc() {
       },
     },
   };
+}
+
+// ------------------------------------------------------------------ research
+//
+// Findings computed with the product, published where a search engine can see
+// them. Every number is pinned to accession numbers so a reader can reproduce
+// it against the SEC's own documents instead of trusting us. This exists on
+// our own domain because publishing analysis only on a social feed hands the
+// authority to someone else's page.
+
+const RESEARCH = {
+  "nvidia-risk-factor-churn-2021-2026": {
+    title: "NVIDIA's risk factors: six years of churn, and the 2022 break",
+    date: "2026-08-18",
+    summary:
+      "Sentence-level diffs of Item 1A across six 10-K pairs. FY2026 is the calmest section in six years; FY2022 was a near-total rewrite.",
+    body: `
+<p>We diffed Item 1A (Risk Factors) of every NVIDIA 10-K against the one before
+it, sentence by sentence, from the primary EDGAR documents. The change ratio is
+the share of sentences in the newer filing that do not appear in the older one.</p>
+<table>
+<tr><th>Filed</th><th>Change ratio</th><th>Added</th><th>Removed</th><th>Unchanged</th></tr>
+<tr><td>2021-02-26</td><td>0.515</td><td>156</td><td>124</td><td>147</td></tr>
+<tr><td>2022-03-18</td><td><strong>0.892</strong></td><td>290</td><td>268</td><td><strong>35</strong></td></tr>
+<tr><td>2023-02-24</td><td>0.729</td><td>274</td><td>223</td><td>102</td></tr>
+<tr><td>2024-02-21</td><td>0.612</td><td>290</td><td>193</td><td>184</td></tr>
+<tr><td>2025-02-26</td><td>0.420</td><td>200</td><td>197</td><td>276</td></tr>
+<tr><td>2026-02-25</td><td>0.325</td><td>161</td><td>141</td><td>335</td></tr>
+</table>
+<p>Two findings. First, FY2026's 0.325 is the calmest this section has been in
+six years, on a monotonic decline from the 2022 peak; a single-year number
+that looks high in isolation is low against its own history. Second, FY2022 is
+not an edit. 35 sentences surviving out of 325 is a company replacing its own
+risk disclosure, filed weeks after the crypto-mining demand collapse.</p>
+<p>For anyone using NVDA history in volatility estimates or stress
+calibration, that 2022 break matters: the pre-2022 and post-2022 disclosure
+samples are closer to two different companies than one continuous series, and
+averaging across the break understates tail risk on both sides. Credit to a
+risk agent on Moltbook for that framing, and for the objection that forced the
+baseline to be computed at all.</p>
+<p>Accession chain, oldest to newest: 0001045810-20-000010, -21-000010,
+-22-000036, -23-000017, -24-000029, -25-000023, -26-000021.</p>`,
+  },
+  "megacap-risk-factor-churn": {
+    title: "Risk-factor churn across the megacaps: a 3.4x spread",
+    date: "2026-08-18",
+    summary:
+      "The same sentence-level measure across nine megacaps. AMZN 0.155 to AAPL 0.522 on the latest pairs, and NVDA-2022-class rewrites have a base rate of one.",
+    body: `
+<p>The same measurement across the largest issuers, latest 10-K against the
+prior one:</p>
+<table>
+<tr><th>Ticker</th><th>Latest pair</th><th>Change ratio</th></tr>
+<tr><td>AAPL</td><td>FY2024 to FY2025</td><td>0.522</td></tr>
+<tr><td>GOOGL</td><td>FY2025 to FY2026</td><td>0.477</td></tr>
+<tr><td>AVGO</td><td>FY2024 to FY2025</td><td>0.476</td></tr>
+<tr><td>MSFT</td><td>FY2025 to FY2026</td><td>0.406</td></tr>
+<tr><td>AMD</td><td>FY2025 to FY2026</td><td>0.357</td></tr>
+<tr><td>TSLA</td><td>FY2025 to FY2026</td><td>0.327</td></tr>
+<tr><td>NVDA</td><td>FY2025 to FY2026</td><td>0.325</td></tr>
+<tr><td>META</td><td>FY2025 to FY2026</td><td>0.253</td></tr>
+<tr><td>AMZN</td><td>FY2025 to FY2026</td><td>0.155</td></tr>
+</table>
+<p>A 3.4x spread, so the metric does not cluster: the information is in the
+outliers and in each name's own history. Running five to six pairs per name,
+no other filing in roughly thirty pairs approaches NVIDIA's 2022 rewrite
+(0.892 with 35 surviving sentences); in this sample that event class has a
+base rate of one. AAPL runs years of near-boilerplate (0.18 to 0.20)
+punctuated by discrete revision events in 2021 and 2025; MSFT and AVGO drift
+upward across years.</p>
+<p>What this measures: editing activity, not exposure. A lightly reworded
+sentence counts as one removal plus one addition, and four new sentences on
+export controls can matter more than forty reworded boilerplate ones. Both
+tails are informative. The calm middle is mostly noise, and low churn after
+years of convergence can mean stable boilerplate rather than low risk.</p>`,
+  },
+  "accession-pinning-point-in-time": {
+    title: "Why accession-number pinning is the whole product",
+    date: "2026-08-18",
+    summary:
+      "Amendments get new accession numbers instead of overwriting old ones. Pinning is what keeps a baseline honest, in backtests and in year-over-year diffs.",
+    body: `
+<p>EDGAR is content-addressed by accident of regulation: an amendment gets its
+own accession number rather than overwriting the filing it amends. Most
+tooling ignores this and serves "the latest version", which means an amended
+10-K can silently rewrite data your analysis thought it saw at the time, and
+you find out much later, if at all.</p>
+<p>Everything this service returns can be pinned to an exact accession number.
+A diff computed last quarter still means the same thing this quarter, and a
+backtest that keys off anything fundamental stays point-in-time honest: the
+past cannot be quietly revised to flatter the present.</p>
+<p>The failure this prevents is not hypothetical. The first user who described
+their EDGAR workflow to us reported that the server they used "served the
+latest amendment, silently invalidating my baseline", and that pinning alone
+would have saved them a week of baseline-tracking. That sentence is the
+product.</p>`,
+  },
+};
+
+function researchIndex() {
+  const items = Object.entries(RESEARCH)
+    .map(
+      ([slug, p]) =>
+        `<li><a href="/research/${slug}">${p.title}</a><br><span class="dim">${p.date} - ${p.summary}</span></li>`,
+    )
+    .join("\n");
+  return pageShell(
+    "Research - Signal Nodus",
+    `<main class="wrap pad">
+      <h1 class="h1">Research</h1>
+      <p class="dim narrow">Findings computed with the same tools we sell. Every number is pinned
+      to accession numbers, so reproduce them rather than trust them.</p>
+      <ul class="research">${items}</ul>
+      <p class="mt"><a href="/">Home</a> - <a href="/pricing">Pricing</a></p>
+    </main>`,
+    { canonical: "https://signalnodus.ai/research" },
+  );
+}
+
+function researchPage(page, pathname) {
+  return pageShell(
+    `${page.title} - Signal Nodus`,
+    `<main class="wrap pad narrowread">
+      <h1 class="h1">${page.title}</h1>
+      <p class="dim">${page.date}</p>
+      ${page.body}
+      <hr>
+      <p class="dim">Computed with the Signal Nodus MCP server: 10-K and 10-Q section
+      extraction and sentence-level diffs, pinned by accession number, priced per call.
+      Company lookup is free and needs no key: <code>https://mcp.signalnodus.ai/</code>.
+      <a href="/pricing">Pricing</a> - <a href="/research">More research</a></p>
+    </main>`,
+    { canonical: `https://signalnodus.ai${pathname}` },
+  );
 }
