@@ -15,6 +15,7 @@ import { Mppx, stripe as mppStripe } from "mppx/server";
 import { createFacilitatorConfig } from "@coinbase/x402";
 
 import {
+  toolLatestFilings,
   toolLookupCompany,
   toolRecentFilings,
   toolCompanyFinancials,
@@ -219,6 +220,10 @@ const BAZAAR_INFO = {
     q: { company: "NVDA", item: "1A" },
     out: { summary: { added: 161, removed: 141, unchanged: 335, changeRatio: 0.325 }, added: ["..."], removed: ["..."] },
   },
+  "/v1/latest": {
+    q: { form: "8-K", limit: "20" },
+    out: { form: "8-K", returned: 20, filings: [{ form: "8-K", company: "EXAMPLE CORP", accessionNumber: "0001234567-26-000123", items: [{ item: "1.01", title: "Entry into a Material Definitive Agreement" }] }] },
+  },
   "/v1/credit": {
     q: { pack: "starter" },
     out: { api_key: "sn_live_...", credit: "$10.00", note: "settling the 402 IS the registration; no account exists" },
@@ -268,6 +273,7 @@ const ROUTES = {
   "/v1/financials": { tool: "company_financials", run: toolCompanyFinancials },
   "/v1/section": { tool: "filing_section", run: toolFilingSection },
   "/v1/compare": { tool: "compare_filings", run: toolCompareFilings },
+  "/v1/latest": { tool: "latest_filings", run: toolLatestFilings },
 };
 
 export function isMppRoute(pathname) {

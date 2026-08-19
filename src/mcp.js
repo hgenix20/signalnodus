@@ -472,6 +472,25 @@ const TOOLS = [
     },
     annotations: { readOnlyHint: true, openWorldHint: true },
   },
+  {
+    name: "latest_filings",
+    title: "Latest filings hitting EDGAR right now",
+    description:
+      "The market-wide feed of filings as they land at the SEC, optionally filtered by " +
+      "form type. Built for monitoring agents that poll: the answer is cached for 60 " +
+      "seconds upstream, includes 8-K item codes so a watcher can filter on events, and " +
+      "every entry carries its accession number for pinning. " +
+      `Costs ${dollars(priceOf("latest_filings"))} per call.`,
+    inputSchema: {
+      type: "object",
+      properties: {
+        form: { type: "string", description: "Filter to one form type, e.g. 8-K, 10-K, S-1, 13F-HR. Omit for all." },
+        limit: { type: "integer", minimum: 1, maximum: 40, description: "Entries to return. Default 20." },
+      },
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: true, openWorldHint: true },
+  },
 ];
 
 async function callTool(params, env, ctx, request) {
@@ -512,6 +531,8 @@ async function callTool(params, env, ctx, request) {
         return ok(await toolFilingSection(args, ctx));
       case "compare_filings":
         return ok(await toolCompareFilings(args, ctx));
+      case "latest_filings":
+        return ok(await toolLatestFilings(args, ctx));
       default:
         throw new RpcError(JSON_RPC.INVALID_PARAMS, `unknown tool: ${name}`);
     }
@@ -1076,3 +1097,67 @@ function parseLimit(v) {
   }
   return Math.min(MAX_FILINGS, Math.max(1, Math.floor(n)));
 }
+
+// The polling product. Everything else here is a research call an agent makes
+// a handful of times; this is the one a monitoring agent calls every few
+// minutes all day. SEC's getcurrent feed updates continuously during filing
+// hours; we cache for 60 seconds so a thousand pollers cost EDGAR one fetch
+// a minute instead of a thousand.
+function decodeEntitiesLocal(t) {
+  return t.replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#0?39;/g, "'");
+}
+
+export async function toolLatestFilings(args, ctx) {
+  const form = args.form ? String(args.form).toUpperCase().trim() : "";
+  const limit = Math.min(Math.max(parseInt(args.limit, 10) || 20, 1), 40);
+
+  const feedUrl =
+    "https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent" +
+    `&type=${encodeURIComponent(form)}&company=&dateb=&owner=include&count=40&output=atom`;
+
+  const cache = caches.default;
+  const cacheKey = new Request(feedUrl);
+  let res = await cache.match(cacheKey);
+  if (!res) {
+    res = await fetch(feedUrl, { headers: { "user-agent": SEC_USER_AGENT } });
+    if (!res.ok) throw new ToolError(`SEC current-filings feed returned ${res.status}`);
+    res = new Response(await res.text(), {
+      headers: { "cache-control": "public, max-age=60", "content-type": "application/atom+xml" },
+    });
+    ctx?.waitUntil?.(cache.put(cacheKey, res.clone()));
+  }
+  const xml = await res.text();
+
+  const filings = [];
+  const entries = xml.split("<entry>").slice(1);
+  for (const e of entries) {
+    if (filings.length >= limit) break;
+    const grab = (re) => (e.match(re) || [])[1] || null;
+    const title = decodeEntitiesLocal(grab(/<title>([\s\S]*?)<\/title>/) || "");
+    const m = title.match(/^(\S+)\s+-\s+(.*?)\s+\((\d{10})\)/);
+    const acc = grab(/accession-number=([0-9-]+)/);
+    const items = [...e.matchAll(/Item\s+([\d.]+):\s*([^&<]+)/g)].map((x) => ({
+      item: x[1],
+      title: x[2].trim(),
+    }));
+    filings.push({
+      form: m ? m[1] : null,
+      company: m ? m[2] : title,
+      cik: m ? m[3] : null,
+      accessionNumber: acc,
+      filedAt: grab(/<updated>([^<]+)<\/updated>/),
+      indexUrl: grab(/href="([^"]+-index\.htm)"/),
+      ...(items.length ? { items } : {}),
+    });
+  }
+
+  return {
+    form: form || "all",
+    returned: filings.length,
+    asOf: (xml.match(/<updated>([^<]+)<\/updated>/) || [])[1] || null,
+    filings,
+    note: "Feed caches for 60 seconds. Poll faster than that and you get the cached answer for free upstream, but still pay per call.",
+    _provenance: PROVENANCE,
+  };
+}
+

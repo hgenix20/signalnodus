@@ -893,6 +893,10 @@ function openApiDoc() {
         q("from_accession", "Older filing to compare from."),
         q("to_accession", "Newer filing to compare to."),
       ]),
+      "/v1/latest": path("latest_filings", "Market-wide feed of filings as they land at EDGAR.", [
+        q("form", "Filter to one form type, e.g. 8-K."),
+        q("limit", "Entries to return, max 40."),
+      ]),
       "/v1/credit": {
         get: {
           summary: "Buy a reusable API key with a machine payment.",

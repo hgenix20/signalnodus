@@ -37,6 +37,7 @@ export const PRICING = {
   recent_filings: 10, // $0.01
   company_financials: 10, // $0.01
   filing_section: 50, // $0.05
+  latest_filings: 10, // $0.01 — the polling product; volume, not margin
   compare_filings: 500, // $0.50 — clears the card minimum, so both rails work
 };
 
@@ -121,6 +122,7 @@ const PAYABLE_ROUTE = {
   company_financials: "/v1/financials",
   filing_section: "/v1/section",
   compare_filings: "/v1/compare",
+  latest_filings: "/v1/latest",
 };
 
 // What a caller gets when they are out of credit. Shaped so an agent can act on
