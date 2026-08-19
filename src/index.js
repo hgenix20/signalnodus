@@ -397,6 +397,12 @@ function placeholder(name, note) {
 }
 
 const BASE_CSS = `
+/* buy buttons */
+.buyrow{display:flex;gap:.8rem;flex-wrap:wrap;margin:.6rem 0 1rem}
+button.buy{font:inherit;padding:.6rem 1.2rem;border-radius:6px;border:1px solid #2a5;background:#0a6;color:#fff;cursor:pointer}
+button.buy:hover{filter:brightness(1.1)}
+button.buy:disabled{opacity:.5;cursor:wait}
+
 /* research pages */
 .narrowread{max-width:46rem}
 .narrowread table{border-collapse:collapse;margin:1rem 0;width:100%}
@@ -456,6 +462,33 @@ ul.research li{margin:0 0 1rem 0}
 function siteScript(env) {
   const sitekey = JSON.stringify(String(env.TURNSTILE_SITEKEY || ""));
   return `(() => {
+  // Buy buttons: create a Stripe checkout session and go there. The API
+  // existed all along; the page just never gave humans a way to call it.
+  document.addEventListener("click", async (ev) => {
+    const b = ev.target.closest("button.buy");
+    if (!b) return;
+    const status = document.getElementById("buy-status");
+    b.disabled = true;
+    if (status) status.textContent = "Creating checkout...";
+    try {
+      const r = await fetch("/api/checkout", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ pack: b.dataset.pack }),
+      });
+      const d = await r.json();
+      if (d && d.checkout_url) {
+        location.href = d.checkout_url;
+      } else {
+        if (status) status.textContent = "Checkout failed: " + (d && d.error ? d.error : "unknown error");
+        b.disabled = false;
+      }
+    } catch (e) {
+      if (status) status.textContent = "Checkout failed; use the curl command below.";
+      b.disabled = false;
+    }
+  });
+
   const el = () => document.getElementById("contact-result");
 
   window.onTurnstileOK = async (token) => {
@@ -656,13 +689,23 @@ compare_filings       $0.50   the same item diffed across two filings</pre>
 
       <section class="mt">
         <h2>Buy credit</h2>
+        <p class="sub">Card checkout through Stripe. Your API key is on the success page.</p>
+        <div class="buyrow">
+          <button class="buy" data-pack="starter">Starter &middot; $9</button>
+          <button class="buy" data-pack="builder">Builder &middot; $39</button>
+          <button class="buy" data-pack="scale">Scale &middot; $149</button>
+        </div>
+        <p class="sub dim" id="buy-status"></p>
+        <p class="sub">Agents buy the same thing without a browser:</p>
         <pre class="block">curl -X POST https://signalnodus.ai/api/checkout \
   -H 'content-type: application/json' \
   -d '{"pack":"starter"}'</pre>
         <p class="sub">
-          Returns a Stripe checkout link. Pay it and your key is on the success
-          page. Then send <code>Authorization: Bearer &lt;key&gt;</code> and check
-          <code>/api/balance</code> whenever you like.
+          Or fully autonomously with a machine payment:
+          <code>GET https://api.signalnodus.ai/v1/credit?pack=starter</code>
+          answers 402; settle it and the response body contains your key.
+          After buying, send <code>Authorization: Bearer &lt;key&gt;</code> and
+          check <code>/api/balance</code> whenever you like.
         </p>
       </section>
     </main>`,
