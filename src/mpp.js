@@ -240,6 +240,10 @@ function withBazaar(challengeResponse, pathname) {
     payload.extensions = {
       ...(payload.extensions || {}),
       bazaar: {
+        // The flag CDP actually keys indexing on. Without it the extension is
+        // decoration; with it, the service is cataloged after the first
+        // payment the facilitator sees.
+        discoverable: true,
         info: {
           input: { type: "http", method: "GET", queryParams: info.q },
           output: { type: "json", example: info.out },
