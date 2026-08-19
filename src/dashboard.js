@@ -287,6 +287,15 @@ async function usagePicture(env) {
       `subject NOT LIKE '%x402-observer%' AND subject NOT LIKE '%EndpointProbe%'
        AND subject NOT LIKE '%CarbonMonitor%' AND subject NOT LIKE '%healthcheck%'
        AND subject NOT LIKE 'challenge:2a01:4f8:c015:6024%'`;
+    // Human page views, logged by the Worker since 2026-08-19. Bots filtered
+    // at write time; this is the closest thing to "did a person see pricing".
+    const pageViews = await env.BILLING.prepare(
+      `SELECT tool AS page, COUNT(*) AS views, COUNT(DISTINCT subject) AS people,
+              MAX(created_at) AS last_seen
+       FROM usage WHERE billable = 0 AND tool LIKE 'view:%'
+       GROUP BY tool ORDER BY views DESC LIMIT 10`,
+    ).all();
+
     const challenges = await env.BILLING.prepare(
       `SELECT COUNT(*) AS shown, COUNT(DISTINCT subject) AS visitors
        FROM usage WHERE billable = 0 AND tool LIKE '402:%' AND ${NOT_DEMAND}`,
@@ -298,6 +307,7 @@ async function usagePicture(env) {
       paidAfterChallenge: Number(paidAfter?.n || 0),
       challengeVisitors: Number(challenges?.visitors || 0),
       visitorRows: visitors.results || [],
+      pageViewRows: pageViews.results || [],
       settledCount: Number(settled?.n || 0),
       settledAmount: Number(settled?.amount || 0),
       byTool: byTool.results || [],
@@ -495,6 +505,14 @@ function render({ money: m, usage, keys, health }) {
     ${stat("Credit consumed", usage.available ? dollars(usage.charged) : "—", "billed against keys")}
     ${stat("Distinct callers", usage.available ? String(usage.callers) : "—", "all time")}
   </div>
+
+  <h2 class="mt">Human page views</h2>
+  <p class="dim narrow">Site pages seen by browsers, bots filtered at write time. Empty means no human has visited since logging began.</p>
+  ${(usage.pageViewRows || []).length
+    ? `<table class="packs"><tr><th>Page</th><th>Views</th><th>People</th><th>Last seen</th></tr>${usage.pageViewRows
+        .map((v) => `<tr><td>${esc(String(v.page).slice(5))}</td><td>${v.views}</td><td>${v.people}</td><td class="dim">${esc(String(v.last_seen).slice(0, 16))}</td></tr>`)
+        .join("")}</table>`
+    : '<p class="dim">None yet.</p>'}
 
   <h2 class="mt">Who arrived</h2>
   <p class="dim narrow">Challenge subjects, newest first. A health probe hits one route on a schedule; a real buyer walks the catalog.</p>
