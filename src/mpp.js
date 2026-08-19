@@ -257,7 +257,35 @@ function withBazaar(challengeResponse, pathname) {
     };
     const headers = new Headers(challengeResponse.headers);
     headers.set("PAYMENT-REQUIRED", btoa(JSON.stringify(payload)).replace(/=+$/, ""));
-    return new Response(challengeResponse.body, {
+    // The standard x402 client (x402-fetch, what Coinbase's own docs hand every
+    // buyer) reads the payload from the RESPONSE BODY, not the header. mppx
+    // only writes the header, so a stock client crashed on our 402 with
+    // undefined.map and could never pay, no matter how much USDC it held.
+    // Serve the same payload both places: header for MPP clients, body for
+    // x402 clients. The problem+json body it replaces was for humans, and
+    // humans are not the ones paying here.
+    headers.set("content-type", "application/json");
+    // Same translation problem as the facilitators: the stock client's enum
+    // wants the short chain name, the CAIP id crashes it. Body speaks the
+    // client's dialect; the header keeps CAIP for MPP clients.
+    const resourceUrl = payload?.resource?.url || "";
+    const bodyPayload = {
+      ...payload,
+      x402Version: 1,
+      accepts: (payload.accepts || []).map((a) => ({
+        ...a,
+        network: a.network === "eip155:8453" ? "base" : a.network,
+        // v1 field names the stock client validates. Values are the same
+        // facts the v2 fields already carry, spelled the old way.
+        maxAmountRequired: a.maxAmountRequired ?? a.amount,
+        payTo: a.payTo ?? a.recipient,
+        resource: a.resource ?? resourceUrl,
+        description: a.description ?? "",
+        mimeType: a.mimeType ?? "application/json",
+        maxTimeoutSeconds: a.maxTimeoutSeconds ?? 300,
+      })),
+    };
+    return new Response(JSON.stringify(bodyPayload), {
       status: challengeResponse.status,
       headers,
     });
