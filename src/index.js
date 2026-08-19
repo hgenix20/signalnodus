@@ -1097,6 +1097,67 @@ export controls can matter more than forty reworded boilerplate ones. Both
 tails are informative. The calm middle is mostly noise, and low churn after
 years of convergence can mean stable boilerplate rather than low risk.</p>`,
   },
+  "x402-seller-compatibility": {
+    title: "Why agents stop at your x402 paywall: three compatibility walls, measured",
+    date: "2026-08-19",
+    summary:
+      "We instrumented the stock x402 client against our own 402 flow and found three silent failure walls. Fixing them took a day; finding them took real buyer traffic going nowhere.",
+    body: `
+<p>Our payment funnel showed a pattern that will be familiar to new x402
+sellers: agents arriving from directories, walking the catalog, requesting
+paid routes repeatedly, and never settling. The usual reading is "no funded
+wallets" or "price too high". Before accepting that, we ran the stock client
+(x402-fetch, the library Coinbase's own quickstarts hand every buyer) against
+our own endpoints with a throwaway key, and logged every step. It hit three
+separate walls, each of which failed <em>silently</em>.</p>
+
+<h3>Wall 1: the challenge payload was only in a header</h3>
+<p>Our 402 carried the payment options in the <code>PAYMENT-REQUIRED</code>
+header (the v2 header-transport style some server SDKs emit). The stock
+client reads the <strong>response body</strong>. Result: a crash inside the
+client before anything was signed. Fix: serve the same payload in both
+places.</p>
+
+<h3>Wall 2: v2 field names and CAIP network ids</h3>
+<p>The client validates the body against the v1 schema: it wants
+<code>maxAmountRequired</code>, <code>payTo</code>, <code>resource</code>,
+and a short network name like <code>base</code>. Our payload said
+<code>amount</code>, <code>recipient</code>, and <code>eip155:8453</code>,
+all of which fail its enum and type checks. Fix: emit v1 spellings in the
+body alongside the v2 fields.</p>
+
+<h3>Wall 3: the payment itself was ignored</h3>
+<p>The worst one. After fixing the first two walls, the client parsed the
+challenge, signed a valid EIP-3009 authorization, and sent a correct v1
+<code>X-PAYMENT</code> header. Our payment middleware only understood its own
+proprietary payment encoding, treated the standard payment as <em>no payment
+at all</em>, and re-issued the challenge with no error. A funded buyer paying
+correctly would loop forever. Every "agent that stopped at payment" in our
+logs was an agent paying into that wall.</p>
+<p>Fix: parse v1 <code>X-PAYMENT</code> directly, verify and settle against
+the facilitator before the middleware sees the request, serve only after
+settlement, return the receipt in <code>X-PAYMENT-RESPONSE</code>, and put a
+reason in the body of every rejected payment. The silent re-challenge was
+half the bug: a buyer that is told <em>why</em> can fix its side.</p>
+
+<h3>How to test your own paywall in five minutes</h3>
+<p>Wrap the real client with a throwaway key and watch where it stops:</p>
+<pre>import { wrapFetchWithPayment } from "x402-fetch";
+import { privateKeyToAccount } from "viem/accounts";
+const acct = privateKeyToAccount("0x" + "11".repeat(32)); // no funds, no risk
+const f = wrapFetchWithPayment(fetch, acct);
+await f("https://your-api.example/paid-route");</pre>
+<p>The correct end state is a 402 whose body says the facilitator rejected
+the signature or balance. If the client crashes, you have wall 1 or 2. If it
+sends a payment and gets a bare re-challenge, you have wall 3, and so does
+every buyer you have ever had.</p>
+
+<p>All three walls are invisible from the seller's side: the challenge log
+just shows repeat 402s, indistinguishable from window-shopping. The
+ecosystem's directories now probe uptime and schema quality, but nothing
+probes <em>settleability with the stock client</em>, which is the only thing
+a buyer actually needs. Until something does, run the five-minute test.</p>`,
+  },
   "accession-pinning-point-in-time": {
     title: "Why accession-number pinning is the whole product",
     date: "2026-08-18",
