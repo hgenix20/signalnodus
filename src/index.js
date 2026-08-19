@@ -282,6 +282,10 @@ function apiResponse(request, url, env) {
   // API host unregisterable.
   if (url.pathname === "/openapi.json") return json(openApiDoc());
   if (url.pathname === "/.well-known/mcp.json") return json(mcpDescriptor());
+  // 402 Index domain-ownership proof. Public hash, instant listing approval.
+  if (url.pathname === "/.well-known/402index-verify.txt") {
+    return asset("7c8bf86a54822a288ab3ac9ad28d2319185dd1c2f7e03b4ad168f9ccc43cf032", "text/plain");
+  }
 
   switch (url.pathname) {
     case "/":
