@@ -154,6 +154,16 @@ export async function handleDashboard(request, env, url) {
   });
 }
 
+// Challenge subjects embed caller-controlled user-agent strings; anything
+// rendered from them gets escaped, no exceptions.
+function esc(x) {
+  return String(x)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
 function notFound() {
   return new Response("Not found", { status: 404, headers: { "content-type": "text/plain" } });
 }
@@ -260,6 +270,16 @@ async function usagePicture(env) {
        FROM usage WHERE billable = 1 AND tool LIKE 'x402:%'`,
     ).first();
 
+    // Who the arrivals actually are. The subject carries address and user
+    // agent, which is what separates a directory health probe from a real
+    // buyer who saw the price and left, and those two need different fixes.
+    const visitors = await env.BILLING.prepare(
+      `SELECT subject, COUNT(*) AS challenges, MAX(created_at) AS last_seen,
+              GROUP_CONCAT(DISTINCT tool) AS tools
+       FROM usage WHERE billable = 0 AND tool LIKE '402:%'
+       GROUP BY subject ORDER BY MAX(created_at) DESC LIMIT 20`,
+    ).all();
+
     const challenges = await env.BILLING.prepare(
       `SELECT COUNT(*) AS shown, COUNT(DISTINCT subject) AS visitors
        FROM usage WHERE billable = 0 AND tool LIKE '402:%'`,
@@ -270,6 +290,7 @@ async function usagePicture(env) {
       challengesShown: Number(challenges?.shown || 0),
       paidAfterChallenge: Number(paidAfter?.n || 0),
       challengeVisitors: Number(challenges?.visitors || 0),
+      visitorRows: visitors.results || [],
       settledCount: Number(settled?.n || 0),
       settledAmount: Number(settled?.amount || 0),
       byTool: byTool.results || [],
@@ -467,6 +488,18 @@ function render({ money: m, usage, keys, health }) {
     ${stat("Credit consumed", usage.available ? dollars(usage.charged) : "—", "billed against keys")}
     ${stat("Distinct callers", usage.available ? String(usage.callers) : "—", "all time")}
   </div>
+
+  <h2 class="mt">Who arrived</h2>
+  <p class="dim narrow">Challenge subjects, newest first. A health probe hits one route on a schedule; a real buyer walks the catalog.</p>
+  <table class="packs">
+    <tr><th>Subject</th><th>Challenges</th><th>Tools</th><th>Last seen</th></tr>
+    ${(usage.visitorRows || [])
+      .map(
+        (v) =>
+          `<tr><td class="dim">${esc(String(v.subject).slice(10, 90))}</td><td>${v.challenges}</td><td class="dim">${esc(String(v.tools || "").replace(/402:/g, "").slice(0, 60))}</td><td class="dim">${esc(String(v.last_seen).slice(0, 16))}</td></tr>`,
+      )
+      .join("")}
+  </table>
 
   <h2 class="mt">Demand</h2>
   <p class="dim narrow">A payment challenge shown and not taken up means someone arrived, saw the price, and declined. No challenges at all means nobody arrived, which is a different problem with a different fix.</p>
