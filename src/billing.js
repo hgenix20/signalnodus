@@ -40,6 +40,10 @@ export const PRICING = {
   who_holds: 50, // $0.05 — inverse 13F query via full-text search
   institutional_holdings: 50, // $0.05 — parsed 13F, aggregated by issuer
   insider_trades: 50, // $0.05 — parsed Form 4s; the trading-agent product
+  evm_balance: 10, // $0.01 — onchain cluster, keyless upstream
+  evm_gas: 10, // $0.01
+  evm_receipt: 10, // $0.01
+  token_price: 10, // $0.01
   latest_filings: 10, // $0.01 — the polling product; volume, not margin
   compare_filings: 500, // $0.50 — clears the card minimum, so both rails work
 };
@@ -128,6 +132,10 @@ const PAYABLE_ROUTE = {
   who_holds: "/v1/whoholds",
   institutional_holdings: "/v1/holdings",
   insider_trades: "/v1/insider",
+  evm_balance: "/v1/evm/balance",
+  evm_gas: "/v1/evm/gas",
+  evm_receipt: "/v1/evm/receipt",
+  token_price: "/v1/token/price",
   latest_filings: "/v1/latest",
 };
 

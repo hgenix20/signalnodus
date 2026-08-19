@@ -719,7 +719,9 @@ service works before wiring payment; everything that does real work is priced.
 - who_holds           ${price("who_holds")}  which institutions hold a stock (inverse 13F)
 - institutional_holdings ${price("institutional_holdings")}  parsed 13F: top positions, % of portfolio
 - insider_trades      ${price("insider_trades")}  parsed Form 4s: who traded, role, shares, price
-- latest_filings      ${price("latest_filings")}  market-wide live filing feed, built for polling
+- latest_filings      ${price("latest_filings")}
+- evm_balance / evm_gas / evm_receipt  ${price("evm_balance")} each  (Base + Ethereum, keyless RPC)
+- token_price         ${price("token_price")}  DEX-aggregated price, FDV, volume  market-wide live filing feed, built for polling
 - compare_filings     ${price("compare_filings")}
 
 ## How to pay
@@ -913,6 +915,21 @@ function openApiDoc() {
       "/v1/latest": path("latest_filings", "Market-wide feed of filings as they land at EDGAR.", [
         q("form", "Filter to one form type, e.g. 8-K."),
         q("limit", "Entries to return, max 40."),
+      ]),
+      "/v1/evm/balance": path("evm_balance", "Native balance of any address, Base or Ethereum.", [
+        q("chain", "base or ethereum. Default base."),
+        q("address", "0x address.", true),
+      ]),
+      "/v1/evm/gas": path("evm_gas", "Current gas price, Base or Ethereum.", [
+        q("chain", "base or ethereum. Default base."),
+      ]),
+      "/v1/evm/receipt": path("evm_receipt", "Transaction receipt: status, gas used, logs.", [
+        q("chain", "base or ethereum. Default base."),
+        q("tx", "Transaction hash.", true),
+      ]),
+      "/v1/token/price": path("token_price", "Token price, FDV, market cap, 24h volume from aggregated DEX data.", [
+        q("chain", "base or ethereum. Default base."),
+        q("token", "Token contract address.", true),
       ]),
       "/v1/credit": {
         get: {

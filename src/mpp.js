@@ -27,6 +27,7 @@ import {
 } from "./mcp.js";
 import { priceOf, dollars, UNITS_PER_DOLLAR } from "./billing.js";
 import { PACKS, mintKey } from "./payments.js";
+import { toolEvmBalance, toolEvmGas, toolEvmReceipt, toolTokenPrice } from "./onchain.js";
 
 // Stripe's stated minimum for a card payment made with a shared payment token.
 const CARD_MINIMUM_UNITS = 500; // $0.50
@@ -239,6 +240,22 @@ const BAZAAR_INFO = {
     q: { form: "8-K", limit: "20" },
     out: { form: "8-K", returned: 20, filings: [{ form: "8-K", company: "EXAMPLE CORP", accessionNumber: "0001234567-26-000123", items: [{ item: "1.01", title: "Entry into a Material Definitive Agreement" }] }] },
   },
+  "/v1/evm/balance": {
+    q: { chain: "base", address: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913" },
+    out: { chain: "base", balanceEth: 0.0421, atBlock: "50113122" },
+  },
+  "/v1/evm/gas": {
+    q: { chain: "base" },
+    out: { chain: "base", gasPriceGwei: 0.006, atBlock: "50113122" },
+  },
+  "/v1/evm/receipt": {
+    q: { chain: "base", tx: "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef" },
+    out: { status: "success", gasUsed: "52341", logCount: 2 },
+  },
+  "/v1/token/price": {
+    q: { chain: "base", token: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913" },
+    out: { symbol: "USDC", priceUsd: 1.0, volume24hUsd: 51234567.0 },
+  },
   "/v1/credit": {
     q: { pack: "starter" },
     out: { api_key: "sn_live_...", credit: "$10.00", note: "settling the 402 IS the registration; no account exists" },
@@ -317,6 +334,10 @@ const ROUTES = {
   "/v1/section": { tool: "filing_section", run: toolFilingSection },
   "/v1/compare": { tool: "compare_filings", run: toolCompareFilings },
   "/v1/latest": { tool: "latest_filings", run: toolLatestFilings },
+  "/v1/evm/balance": { tool: "evm_balance", run: toolEvmBalance },
+  "/v1/evm/gas": { tool: "evm_gas", run: toolEvmGas },
+  "/v1/evm/receipt": { tool: "evm_receipt", run: toolEvmReceipt },
+  "/v1/token/price": { tool: "token_price", run: toolTokenPrice },
   "/v1/insider": { tool: "insider_trades", run: toolInsiderTrades },
   "/v1/holdings": { tool: "institutional_holdings", run: toolInstitutionalHoldings },
   "/v1/whoholds": { tool: "who_holds", run: toolWhoHolds },
