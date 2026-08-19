@@ -15,6 +15,7 @@ import { Mppx, stripe as mppStripe } from "mppx/server";
 import { createFacilitatorConfig } from "@coinbase/x402";
 
 import {
+  toolInstitutionalHoldings,
   toolInsiderTrades,
   toolLatestFilings,
   toolLookupCompany,
@@ -221,6 +222,10 @@ const BAZAAR_INFO = {
     q: { company: "NVDA", item: "1A" },
     out: { summary: { added: 161, removed: 141, unchanged: 335, changeRatio: 0.325 }, added: ["..."], removed: ["..."] },
   },
+  "/v1/holdings": {
+    q: { company: "Berkshire Hathaway", top: "10" },
+    out: { manager: "BERKSHIRE HATHAWAY INC", distinctIssuers: 40, holdings: [{ issuer: "APPLE INC", valueUsd: 60000000000, pctOfPortfolio: 22.5 }] },
+  },
   "/v1/insider": {
     q: { company: "NVDA", limit: "5" },
     out: { company: "NVIDIA CORP", returned: 5, filings: [{ insider: "HUANG JEN HSUN", roles: ["officer","director"], transactions: [{ code: "S", meaning: "open-market sale", shares: 75000, pricePerShare: 181.32 }] }] },
@@ -308,6 +313,7 @@ const ROUTES = {
   "/v1/compare": { tool: "compare_filings", run: toolCompareFilings },
   "/v1/latest": { tool: "latest_filings", run: toolLatestFilings },
   "/v1/insider": { tool: "insider_trades", run: toolInsiderTrades },
+  "/v1/holdings": { tool: "institutional_holdings", run: toolInstitutionalHoldings },
 };
 
 export function isMppRoute(pathname) {

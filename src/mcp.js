@@ -473,6 +473,25 @@ const TOOLS = [
     annotations: { readOnlyHint: true, openWorldHint: true },
   },
   {
+    name: "institutional_holdings",
+    title: "Parsed 13F holdings",
+    description:
+      "An institutional manager's latest 13F-HR parsed and aggregated: top positions " +
+      "by value with shares, CUSIP, and share of portfolio. Works on managers " +
+      "(Berkshire, Bridgewater...), not operating companies. Pinned by accession " +
+      `number. Costs ${dollars(priceOf("institutional_holdings"))} per call.`,
+    inputSchema: {
+      type: "object",
+      properties: {
+        company: { type: "string", description: "Manager name or CIK, e.g. Berkshire Hathaway." },
+        top: { type: "integer", minimum: 1, maximum: 100, description: "Positions to return. Default 20." },
+      },
+      required: ["company"],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: true, openWorldHint: true },
+  },
+  {
     name: "insider_trades",
     title: "Parsed insider trades (Form 4)",
     description:
@@ -554,6 +573,8 @@ async function callTool(params, env, ctx, request) {
         return ok(await toolLatestFilings(args, ctx));
       case "insider_trades":
         return ok(await toolInsiderTrades(args, ctx));
+      case "institutional_holdings":
+        return ok(await toolInstitutionalHoldings(args, ctx));
       default:
         throw new RpcError(JSON_RPC.INVALID_PARAMS, `unknown tool: ${name}`);
     }
@@ -1279,6 +1300,94 @@ export async function toolInsiderTrades(args, ctx) {
     returned: filings.length,
     filings,
     note: "Non-derivative transactions parsed in full; derivative (options) transactions are counted, not expanded. Pass limit up to 10.",
+    _provenance: PROVENANCE,
+  };
+}
+
+// 13F-HR parsed: what an institution actually holds, aggregated by issuer and
+// sorted by value. The manager files raw infotable XML; a trading agent wants
+// "top positions and how big". Same indexOf discipline as the Form 4 parser.
+export async function toolInstitutionalHoldings(args, ctx) {
+  // Managers have no tickers, so the usual resolver only understands their
+  // CIK. Fall back to EDGAR's company search, scoped to 13F filers, so
+  // "Berkshire Hathaway" works the way an agent will actually ask.
+  let cik;
+  try {
+    cik = await resolveCik(args.company, ctx);
+  } catch (err) {
+    const name = String(args.company || "").slice(0, 80);
+    const atom = await secFetchText(
+      `https://www.sec.gov/cgi-bin/browse-edgar?company=${encodeURIComponent(name)}&type=13F-HR&action=getcompany&output=atom&count=1`,
+      SUBMISSIONS_TTL,
+      ctx,
+      { 404: "manager search failed" },
+    );
+    const m = atom.match(/CIK=(\d{10})/) || atom.match(/CIK=(\d+)/);
+    if (!m) throw new ToolError(`no 13F filer found matching "${name}"`);
+    cik = m[1].padStart(10, "0");
+  }
+  const sub = await fetchSubmissions(cik, ctx);
+  const top = Math.min(Math.max(parseInt(args.top, 10) || 20, 1), 100);
+
+  const r = sub.filings?.recent || {};
+  let pick = null;
+  for (let i = 0; i < (r.form || []).length; i++) {
+    if (String(r.form[i]).startsWith("13F-HR")) {
+      pick = { acc: r.accessionNumber[i], date: r.filingDate[i], form: r.form[i] };
+      break;
+    }
+  }
+  if (!pick) throw new ToolError(`no 13F-HR filings found for CIK ${cik}; 13F filers are institutional managers, not operating companies`);
+
+  const accPlain = pick.acc.replace(/-/g, "");
+  const base = `https://www.sec.gov/Archives/edgar/data/${Number(cik)}/${accPlain}`;
+  const index = await secFetch(`${base}/index.json`, SUBMISSIONS_TTL, ctx, { 404: "filing index not found" });
+  const xmlName = (index?.directory?.item || [])
+    .map((it) => it.name)
+    .find((n) => n && n.endsWith(".xml") && !/primary_doc/i.test(n));
+  if (!xmlName) throw new ToolError("no information table found in the filing");
+
+  const xml = await secFetchText(`${base}/${xmlName}`, SUBMISSIONS_TTL, ctx, { 404: "information table not found" });
+
+  const grab = (block, tag) => {
+    const i = block.indexOf("<" + tag + ">");
+    if (i < 0) return null;
+    const j = block.indexOf("</" + tag + ">", i);
+    if (j < 0) return null;
+    return block.slice(i + tag.length + 2, j).trim();
+  };
+
+  // Aggregate rows by issuer: managers report the same security across
+  // sub-accounts, and a reader wants the position, not the bookkeeping.
+  const byIssuer = new Map();
+  let rows = 0;
+  let totalValue = 0;
+  for (const t of xml.split("<infoTable>").slice(1)) {
+    rows++;
+    const issuer = grab(t, "nameOfIssuer");
+    const value = Number(grab(t, "value")) || 0;
+    const shares = Number(grab(t, "sshPrnamt")) || 0;
+    totalValue += value;
+    const cur = byIssuer.get(issuer) || { issuer, cusip: grab(t, "cusip"), class: grab(t, "titleOfClass"), valueUsd: 0, shares: 0 };
+    cur.valueUsd += value;
+    cur.shares += shares;
+    byIssuer.set(issuer, cur);
+  }
+
+  const holdings = [...byIssuer.values()].sort((a, b) => b.valueUsd - a.valueUsd);
+  for (const h of holdings) h.pctOfPortfolio = totalValue ? Number(((h.valueUsd / totalValue) * 100).toFixed(2)) : null;
+
+  return {
+    cik,
+    manager: sub.name || null,
+    form: pick.form,
+    filedAt: pick.date,
+    accessionNumber: pick.acc,
+    reportRows: rows,
+    distinctIssuers: holdings.length,
+    portfolioValueUsd: totalValue,
+    holdings: holdings.slice(0, top),
+    note: "Values are as-reported USD. Rows aggregated by issuer across sub-accounts. 13F reports long US-listed positions only: no shorts, no bonds, no foreign-only listings.",
     _provenance: PROVENANCE,
   };
 }

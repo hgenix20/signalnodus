@@ -716,6 +716,7 @@ service works before wiring payment; everything that does real work is priced.
 - recent_filings      ${price("recent_filings")}
 - company_financials  ${price("company_financials")}
 - filing_section      ${price("filing_section")}
+- institutional_holdings ${price("institutional_holdings")}  parsed 13F: top positions, % of portfolio
 - insider_trades      ${price("insider_trades")}  parsed Form 4s: who traded, role, shares, price
 - latest_filings      ${price("latest_filings")}  market-wide live filing feed, built for polling
 - compare_filings     ${price("compare_filings")}
@@ -895,6 +896,10 @@ function openApiDoc() {
         q("form", "Form type, for example 10-K."),
         q("from_accession", "Older filing to compare from."),
         q("to_accession", "Newer filing to compare to."),
+      ]),
+      "/v1/holdings": path("institutional_holdings", "An institutional manager's latest 13F parsed: top positions by value.", [
+        q("company", "Manager name or CIK.", true),
+        q("top", "Positions to return, max 100."),
       ]),
       "/v1/insider": path("insider_trades", "A company's latest Form 4 filings parsed into insider transactions.", [
         q("company", "Ticker or company name.", true),

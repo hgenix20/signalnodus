@@ -37,6 +37,7 @@ export const PRICING = {
   recent_filings: 10, // $0.01
   company_financials: 10, // $0.01
   filing_section: 50, // $0.05
+  institutional_holdings: 50, // $0.05 — parsed 13F, aggregated by issuer
   insider_trades: 50, // $0.05 — parsed Form 4s; the trading-agent product
   latest_filings: 10, // $0.01 — the polling product; volume, not margin
   compare_filings: 500, // $0.50 — clears the card minimum, so both rails work
@@ -123,6 +124,7 @@ const PAYABLE_ROUTE = {
   company_financials: "/v1/financials",
   filing_section: "/v1/section",
   compare_filings: "/v1/compare",
+  institutional_holdings: "/v1/holdings",
   insider_trades: "/v1/insider",
   latest_filings: "/v1/latest",
 };
