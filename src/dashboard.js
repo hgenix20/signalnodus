@@ -280,9 +280,16 @@ async function usagePicture(env) {
        GROUP BY subject ORDER BY MAX(created_at) DESC LIMIT 20`,
     ).all();
 
+    // Monitors and our own healthcheck are traffic, not demand. Counting them
+    // flattered the funnel: the visitor number read 22 while buyer-shaped
+    // subjects numbered about six.
+    const NOT_DEMAND =
+      `subject NOT LIKE '%x402-observer%' AND subject NOT LIKE '%EndpointProbe%'
+       AND subject NOT LIKE '%CarbonMonitor%' AND subject NOT LIKE '%healthcheck%'
+       AND subject NOT LIKE 'challenge:2a01:4f8:c015:6024%'`;
     const challenges = await env.BILLING.prepare(
       `SELECT COUNT(*) AS shown, COUNT(DISTINCT subject) AS visitors
-       FROM usage WHERE billable = 0 AND tool LIKE '402:%'`,
+       FROM usage WHERE billable = 0 AND tool LIKE '402:%' AND ${NOT_DEMAND}`,
     ).first();
 
     return {
