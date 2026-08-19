@@ -381,6 +381,118 @@ export function describeRoutes() {
   }));
 }
 
+// ------------------------------------------------- standard x402 payments
+//
+// The stock client (x402-fetch, what Coinbase's docs hand every buyer) sends
+// a v1 X-PAYMENT header: base64 JSON with an EIP-3009 authorization. mppx
+// only understands its own MPP encoding and treated that as NO payment,
+// re-challenging forever. Walking the buyer's path with the real client is
+// how this was found: a perfectly valid signed payment earned a wordless 402.
+// Every agent that "stopped at payment" was paying into that wall.
+//
+// So standard payments verify and settle directly against the CDP
+// facilitator, before mppx ever sees the request. Settle-before-serve: the
+// data leaves only after the facilitator confirms the transfer.
+
+const USDC_BASE = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
+
+function parseXPayment(request) {
+  const raw = request.headers.get("X-PAYMENT");
+  if (!raw) return null;
+  try {
+    const pad = raw + "=".repeat((4 - (raw.length % 4)) % 4);
+    const p = JSON.parse(atob(pad));
+    if (p && p.x402Version === 1 && p.scheme === "exact" && p.payload?.authorization) return p;
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+function v1Requirements(env, priceUnits, resourceUrl) {
+  return {
+    scheme: "exact",
+    network: "base",
+    // price is integer tenths-of-a-cent; USDC has 6 decimals, so one unit is
+    // exactly 1000 atomic USDC.
+    maxAmountRequired: String(priceUnits * 1000),
+    resource: resourceUrl,
+    description: "",
+    mimeType: "application/json",
+    payTo: env.BASE_DEPOSIT_ADDRESS,
+    maxTimeoutSeconds: 300,
+    asset: USDC_BASE,
+    extra: { name: "USD Coin", version: "2" },
+  };
+}
+
+async function facilitatorCall(env, endpoint, body) {
+  const facilitator = resolveFacilitator(env);
+  if (!facilitator || typeof facilitator.createAuthHeaders !== "function") {
+    return { ok: false, reason: "facilitator not configured" };
+  }
+  const built = await facilitator.createAuthHeaders();
+  const headers = built?.[endpoint] || {};
+  const res = await fetch(`${String(facilitator.url).replace(/\/+$/, "")}/${endpoint}`, {
+    method: "POST",
+    headers: { ...headers, "content-type": "application/json" },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(20_000),
+  });
+  const text = await res.text();
+  let data = null;
+  try { data = JSON.parse(text); } catch { /* keep raw */ }
+  return { ok: res.ok, status: res.status, data, raw: text.slice(0, 300) };
+}
+
+// Verifies and settles a v1 payment. Returns null when the payment is absent,
+// a settlement object when money moved, or a Response describing exactly why
+// it failed, because the silent re-challenge was half the original bug.
+async function settleStandardX402(request, env, priceUnits, resourceUrl) {
+  const payment = parseXPayment(request);
+  if (!payment) return null;
+
+  const auth = payment.payload.authorization;
+  const wanted = String(priceUnits * 1000);
+  if (env.BASE_DEPOSIT_ADDRESS && String(auth.to).toLowerCase() !== String(env.BASE_DEPOSIT_ADDRESS).toLowerCase()) {
+    return { failed: json({ error: "payment_invalid", detail: "authorization.to is not this service's receiving address" }, 402) };
+  }
+  if (BigInt(auth.value || 0) < BigInt(wanted)) {
+    return { failed: json({ error: "payment_invalid", detail: `authorization.value below price; need ${wanted} atomic USDC` }, 402) };
+  }
+
+  const requirements = v1Requirements(env, priceUnits, resourceUrl);
+  const body = { x402Version: 1, paymentPayload: payment, paymentRequirements: requirements };
+
+  const verify = await facilitatorCall(env, "verify", body);
+  if (!verify.ok || verify.data?.isValid === false) {
+    const reason = verify.data?.invalidReason || verify.data?.error || verify.raw || `verify returned ${verify.status}`;
+    return { failed: json({ error: "payment_invalid", detail: String(reason).slice(0, 200) }, 402) };
+  }
+
+  const settle = await facilitatorCall(env, "settle", body);
+  const success = settle.ok && (settle.data?.success === true || settle.data?.transaction || settle.data?.txHash);
+  if (!success) {
+    const reason = settle.data?.errorReason || settle.data?.error || settle.raw || `settle returned ${settle.status}`;
+    return { failed: json({ error: "settlement_failed", detail: String(reason).slice(0, 200) }, 402) };
+  }
+
+  return {
+    receipt: {
+      success: true,
+      transaction: settle.data?.transaction || settle.data?.txHash || null,
+      network: "base",
+      payer: auth.from,
+    },
+  };
+}
+
+function withPaymentResponse(response, receipt) {
+  const headers = new Headers(response.headers);
+  headers.set("X-PAYMENT-RESPONSE", btoa(JSON.stringify(receipt)).replace(/=+$/, ""));
+  return new Response(response.body, { status: response.status, headers });
+}
+
 export async function handleMppRoute(request, env, ctx, url) {
   if (url.pathname === "/v1/credit") return handleCreditPurchase(request, env, url, ctx);
 
@@ -388,6 +500,29 @@ export async function handleMppRoute(request, env, ctx, url) {
   if (!route) return null;
 
   const price = priceOf(route.tool);
+
+  // Standard x402 clients first: verify and settle their X-PAYMENT against
+  // the facilitator, serve on success, and say exactly why on failure.
+  const std = await settleStandardX402(request, env, price, url.toString());
+  if (std?.failed) {
+    ctx?.waitUntil?.(logChallenge(env, route.tool, request));
+    return std.failed;
+  }
+  if (std?.receipt) {
+    try {
+      const args = Object.fromEntries(url.searchParams.entries());
+      const data = await route.run(args, ctx);
+      ctx?.waitUntil?.(logSettled(env, route.tool, request, price));
+      return withPaymentResponse(json({ ...data, _paid: dollars(price) }), std.receipt);
+    } catch (err) {
+      console.error("paid call failed after standard settlement", route.tool, err);
+      return withPaymentResponse(
+        json({ error: "request_failed_after_payment", detail: String(err?.message || err).slice(0, 300), refund: "Email hgenix@agentmail.to with this receipt." }, 502),
+        std.receipt,
+      );
+    }
+  }
+
   const mppx = await getMppx(env);
 
   if (!mppx) {
