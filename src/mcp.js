@@ -7,6 +7,8 @@
 // Spec: https://modelcontextprotocol.io/specification/2025-06-18
 
 import { htmlToText, extractItem, diffSections, itemCatalog, knownItem } from "./filings.js";
+import { toolEvmBalance, toolEvmGas, toolEvmReceipt, toolTokenPrice } from "./onchain.js";
+import { toolFxRate, toolDomainReport, toolPredictionMarkets } from "./market.js";
 import { authorize, paymentRequired, priceOf, dollars } from "./billing.js";
 
 const SERVER_NAME = "signalnodus";
@@ -548,6 +550,120 @@ const TOOLS = [
     },
     annotations: { readOnlyHint: true, openWorldHint: true },
   },
+  {
+    name: "evm_balance",
+    title: "Native balance on Base or Ethereum",
+    description:
+      "Native balance of any 0x address with block height, from public RPC. " +
+      `Costs ${dollars(priceOf("evm_balance"))} per call.`,
+    inputSchema: {
+      type: "object",
+      properties: {
+        chain: { type: "string", description: "base or ethereum. Default base." },
+        address: { type: "string", description: "0x-prefixed address." },
+      },
+      required: ["address"],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: true, openWorldHint: true },
+  },
+  {
+    name: "evm_gas",
+    title: "Gas price on Base or Ethereum",
+    description:
+      "Current gas price in wei and gwei with block height. " +
+      `Costs ${dollars(priceOf("evm_gas"))} per call.`,
+    inputSchema: {
+      type: "object",
+      properties: {
+        chain: { type: "string", description: "base or ethereum. Default base." },
+      },
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: true, openWorldHint: true },
+  },
+  {
+    name: "evm_receipt",
+    title: "Transaction receipt",
+    description:
+      "Status, gas used, effective gas price and log count for a transaction hash. " +
+      `Costs ${dollars(priceOf("evm_receipt"))} per call.`,
+    inputSchema: {
+      type: "object",
+      properties: {
+        chain: { type: "string", description: "base or ethereum. Default base." },
+        tx: { type: "string", description: "0x-prefixed transaction hash." },
+      },
+      required: ["tx"],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: true, openWorldHint: true },
+  },
+  {
+    name: "token_price",
+    title: "Token price and volume",
+    description:
+      "DEX-aggregated price, FDV, market cap and 24h volume for a token contract. Cached 60s; not an oracle. " +
+      `Costs ${dollars(priceOf("token_price"))} per call.`,
+    inputSchema: {
+      type: "object",
+      properties: {
+        chain: { type: "string", description: "base or ethereum. Default base." },
+        token: { type: "string", description: "Token contract address." },
+      },
+      required: ["token"],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: true, openWorldHint: true },
+  },
+  {
+    name: "fx_rate",
+    title: "FX reference rates",
+    description:
+      "ECB reference rates from one base currency to up to ten targets, ISO 4217. Daily fix, not a tradable quote. " +
+      `Costs ${dollars(priceOf("fx_rate"))} per call.`,
+    inputSchema: {
+      type: "object",
+      properties: {
+        from: { type: "string", description: "Base currency. Default USD." },
+        to: { type: "string", description: "Comma list of targets. Default EUR." },
+      },
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: true, openWorldHint: true },
+  },
+  {
+    name: "domain_report",
+    title: "Domain report",
+    description:
+      "DNS records, SPF presence, registration date and age, registrar, expiry and RDAP status for a hostname, in one call. " +
+      `Costs ${dollars(priceOf("domain_report"))} per call.`,
+    inputSchema: {
+      type: "object",
+      properties: {
+        domain: { type: "string", description: "Bare hostname, e.g. example.com." },
+      },
+      required: ["domain"],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: true, openWorldHint: true },
+  },
+  {
+    name: "prediction_markets",
+    title: "Prediction market odds",
+    description:
+      "Top-volume Polymarket markets with implied probabilities, optionally filtered by a question substring. " +
+      `Costs ${dollars(priceOf("prediction_markets"))} per call.`,
+    inputSchema: {
+      type: "object",
+      properties: {
+        q: { type: "string", description: "Substring filter." },
+        limit: { type: "integer", minimum: 1, maximum: 25, description: "Markets to return. Default 10." },
+      },
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: true, openWorldHint: true },
+  },
 ];
 
 async function callTool(params, env, ctx, request) {
@@ -590,6 +706,20 @@ async function callTool(params, env, ctx, request) {
         return ok(await toolCompareFilings(args, ctx));
       case "latest_filings":
         return ok(await toolLatestFilings(args, ctx));
+      case "evm_balance":
+        return ok(await toolEvmBalance(args));
+      case "evm_gas":
+        return ok(await toolEvmGas(args));
+      case "evm_receipt":
+        return ok(await toolEvmReceipt(args));
+      case "token_price":
+        return ok(await toolTokenPrice(args, ctx));
+      case "fx_rate":
+        return ok(await toolFxRate(args, ctx));
+      case "domain_report":
+        return ok(await toolDomainReport(args, ctx));
+      case "prediction_markets":
+        return ok(await toolPredictionMarkets(args, ctx));
       case "insider_trades":
         return ok(await toolInsiderTrades(args, ctx));
       case "institutional_holdings":
