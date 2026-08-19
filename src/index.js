@@ -721,7 +721,10 @@ service works before wiring payment; everything that does real work is priced.
 - insider_trades      ${price("insider_trades")}  parsed Form 4s: who traded, role, shares, price
 - latest_filings      ${price("latest_filings")}
 - evm_balance / evm_gas / evm_receipt  ${price("evm_balance")} each  (Base + Ethereum, keyless RPC)
-- token_price         ${price("token_price")}  DEX-aggregated price, FDV, volume  market-wide live filing feed, built for polling
+- token_price         ${price("token_price")}  DEX-aggregated price, FDV, volume
+- fx_rate             ${price("fx_rate")}  ECB reference FX rates
+- domain_report       ${price("domain_report")}  DNS + registration age + registrar, one call
+- prediction_markets  ${price("prediction_markets")}  Polymarket implied probabilities  market-wide live filing feed, built for polling
 - compare_filings     ${price("compare_filings")}
 
 ## How to pay
@@ -930,6 +933,17 @@ function openApiDoc() {
       "/v1/token/price": path("token_price", "Token price, FDV, market cap, 24h volume from aggregated DEX data.", [
         q("chain", "base or ethereum. Default base."),
         q("token", "Token contract address.", true),
+      ]),
+      "/v1/fx/rate": path("fx_rate", "ECB reference FX rates, one base to up to ten symbols.", [
+        q("from", "Base currency, ISO 4217. Default USD."),
+        q("to", "Comma list of target currencies. Default EUR."),
+      ]),
+      "/v1/domain/report": path("domain_report", "One-call domain report: DNS records, SPF, registration age, registrar, expiry.", [
+        q("domain", "Bare hostname, e.g. example.com.", true),
+      ]),
+      "/v1/markets/prediction": path("prediction_markets", "Top-volume Polymarket markets with implied probabilities, optionally filtered.", [
+        q("q", "Substring filter over market questions."),
+        q("limit", "Markets to return, max 25."),
       ]),
       "/v1/credit": {
         get: {

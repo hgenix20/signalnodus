@@ -28,6 +28,7 @@ import {
 import { priceOf, dollars, UNITS_PER_DOLLAR } from "./billing.js";
 import { PACKS, mintKey } from "./payments.js";
 import { toolEvmBalance, toolEvmGas, toolEvmReceipt, toolTokenPrice } from "./onchain.js";
+import { toolFxRate, toolDomainReport, toolPredictionMarkets } from "./market.js";
 
 // Stripe's stated minimum for a card payment made with a shared payment token.
 const CARD_MINIMUM_UNITS = 500; // $0.50
@@ -256,6 +257,18 @@ const BAZAAR_INFO = {
     q: { chain: "base", token: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913" },
     out: { symbol: "USDC", priceUsd: 1.0, volume24hUsd: 51234567.0 },
   },
+  "/v1/fx/rate": {
+    q: { from: "USD", to: "EUR,GBP,JPY" },
+    out: { base: "USD", date: "2026-08-18", rates: { EUR: 0.86386, GBP: 0.73933, JPY: 159.7 } },
+  },
+  "/v1/domain/report": {
+    q: { domain: "example.com" },
+    out: { resolves: true, ageDays: 11208, registrar: "ICANN", hasSpf: false, nameservers: ["a.iana-servers.net"] },
+  },
+  "/v1/markets/prediction": {
+    q: { q: "fed", limit: "5" },
+    out: { returned: 5, markets: [{ question: "Fed rate cut in September?", outcomePrices: [0.62, 0.38], volumeUsd: 1234567.0 }] },
+  },
   "/v1/credit": {
     q: { pack: "starter" },
     out: { api_key: "sn_live_...", credit: "$10.00", note: "settling the 402 IS the registration; no account exists" },
@@ -338,6 +351,9 @@ const ROUTES = {
   "/v1/evm/gas": { tool: "evm_gas", run: toolEvmGas },
   "/v1/evm/receipt": { tool: "evm_receipt", run: toolEvmReceipt },
   "/v1/token/price": { tool: "token_price", run: toolTokenPrice },
+  "/v1/fx/rate": { tool: "fx_rate", run: toolFxRate },
+  "/v1/domain/report": { tool: "domain_report", run: toolDomainReport },
+  "/v1/markets/prediction": { tool: "prediction_markets", run: toolPredictionMarkets },
   "/v1/insider": { tool: "insider_trades", run: toolInsiderTrades },
   "/v1/holdings": { tool: "institutional_holdings", run: toolInstitutionalHoldings },
   "/v1/whoholds": { tool: "who_holds", run: toolWhoHolds },

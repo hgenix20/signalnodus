@@ -40,6 +40,9 @@ export const PRICING = {
   who_holds: 50, // $0.05 — inverse 13F query via full-text search
   institutional_holdings: 50, // $0.05 — parsed 13F, aggregated by issuer
   insider_trades: 50, // $0.05 — parsed Form 4s; the trading-agent product
+  fx_rate: 10, // $0.01 — ECB reference rates
+  domain_report: 10, // $0.01 — DNS + RDAP in one call
+  prediction_markets: 10, // $0.01 — Polymarket top-volume search
   evm_balance: 10, // $0.01 — onchain cluster, keyless upstream
   evm_gas: 10, // $0.01
   evm_receipt: 10, // $0.01
@@ -132,6 +135,9 @@ const PAYABLE_ROUTE = {
   who_holds: "/v1/whoholds",
   institutional_holdings: "/v1/holdings",
   insider_trades: "/v1/insider",
+  fx_rate: "/v1/fx/rate",
+  domain_report: "/v1/domain/report",
+  prediction_markets: "/v1/markets/prediction",
   evm_balance: "/v1/evm/balance",
   evm_gas: "/v1/evm/gas",
   evm_receipt: "/v1/evm/receipt",
