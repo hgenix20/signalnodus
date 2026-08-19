@@ -81,12 +81,32 @@ export default {
       case "dev.signalnodus.ai":
         return placeholder("Dev", "Development environment. Expect breakage.");
       default:
-        return apexResponse(request, url, env);
+        return apexResponse(request, url, env, ctx);
     }
   },
 };
 
-async function apexResponse(request, url, env) {
+// Page views for HTML pages, into the same usage table the challenge log
+// uses. Answers "do humans reach the site at all", which nothing measured
+// before. Fire-and-forget; the page never waits on it.
+function logPageView(env, ctx, request, url) {
+  if (!env?.BILLING || !ctx?.waitUntil) return;
+  const ua = request.headers.get("user-agent") || "none";
+  // Skip the obvious non-humans so the number means something.
+  if (/bot|crawler|spider|probe|monitor|curl|python|node|Go-http|HeadlessChrome/i.test(ua)) return;
+  const ip = request.headers.get("cf-connecting-ip") || "unknown";
+  const now = new Date().toISOString();
+  ctx.waitUntil(
+    env.BILLING.prepare(
+      "INSERT INTO usage (subject, tool, cost, billable, day, created_at) VALUES (?, ?, 0, 0, ?, ?)",
+    )
+      .bind(`page:${ip}|${ua.slice(0, 60)}`, `view:${url.pathname.slice(0, 40)}`, now.slice(0, 10), now)
+      .run()
+      .catch(() => {}),
+  );
+}
+
+async function apexResponse(request, url, env, ctx) {
   if (url.pathname === "/api/verify-contact") {
     if (request.method === "OPTIONS") {
       return new Response(null, {
@@ -145,11 +165,11 @@ async function apexResponse(request, url, env) {
       NOINDEX,
     );
   }
-  if (url.pathname === "/pricing") return html(pricingPage());
-  if (url.pathname === "/research") return html(researchIndex());
+  if (url.pathname === "/pricing") { logPageView(env, ctx, request, url); return html(pricingPage()); }
+  if (url.pathname === "/research") { logPageView(env, ctx, request, url); return html(researchIndex()); }
   if (url.pathname.startsWith("/research/")) {
     const page = RESEARCH[url.pathname.slice("/research/".length)];
-    if (page) return html(researchPage(page, url.pathname));
+    if (page) { logPageView(env, ctx, request, url); return html(researchPage(page, url.pathname)); }
   }
 
   if (isDashboardPath(url.pathname)) return handleDashboard(request, env, url);
@@ -189,7 +209,7 @@ ${Object.keys(RESEARCH).map((k) => `  <url><loc>https://signalnodus.ai/research/
   if (url.pathname === "/robots.txt") {
     return asset("User-agent: *\nAllow: /\nSitemap: https://signalnodus.ai/\n", "text/plain");
   }
-  if (url.pathname === "/") return html(landingPage(env));
+  if (url.pathname === "/") { logPageView(env, ctx, request, url); return html(landingPage(env)); }
 
   // Everything else is genuinely absent; saying so beats serving the landing
   // page under a wrong URL with a 200.
