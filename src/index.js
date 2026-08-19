@@ -620,6 +620,7 @@ recent_filings        $0.01
 company_financials    $0.01
 
 filing_section        $0.05   one item extracted from a 10-K or 10-Q
+latest_filings        $0.01   live market-wide filing feed, form-filterable
 compare_filings       $0.50   the same item diffed across two filings</pre>
         <p class="sub">
           <strong>No subscription and no minimum.</strong> <code>lookup_company</code>
@@ -715,6 +716,7 @@ service works before wiring payment; everything that does real work is priced.
 - recent_filings      ${price("recent_filings")}
 - company_financials  ${price("company_financials")}
 - filing_section      ${price("filing_section")}
+- latest_filings      ${price("latest_filings")}  market-wide live filing feed, built for polling
 - compare_filings     ${price("compare_filings")}
 
 ## How to pay
