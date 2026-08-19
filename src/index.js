@@ -518,7 +518,7 @@ function pageShell(title, inner, opts = {}) {
 <title>${title}</title>
 ${canonical ? `<link rel="canonical" href="${canonical}">` : ""}
 ${index ? "" : '<meta name="robots" content="noindex, nofollow">'}
-<meta name="description" content="${description || "Signal Nodus: SEC company data as MCP tools, built for autonomous AI agents."}">
+<meta name="description" content="${description || "Signal Nodus: year-over-year diffs of SEC filing sections, pinned to accession numbers. The diff is the product; raw data is the on-ramp."}">
 <link rel="stylesheet" href="/site.css">
 ${beacon}
 </head>
@@ -794,8 +794,10 @@ function mcpDescriptor() {
     name: "signalnodus",
     version: "0.3.0",
     description:
-      "SEC filing extraction over MCP. Pinned 10-K and 10-Q section text and " +
-      "sentence-level year-over-year diffs, from the primary SEC record.",
+      "The diff is the product: sentence-level year-over-year comparison of SEC " +
+      "10-K/10-Q sections, pinned to accession numbers so an amendment can never " +
+      "move a baseline. Free EDGAR servers exist for raw data; this one sells " +
+      "what changed.",
     homepage: "https://signalnodus.ai",
     openapi: "https://signalnodus.ai/openapi.json",
     transports: [{ type: "streamable-http", url: "https://mcp.signalnodus.ai/" }],
@@ -853,7 +855,9 @@ function openApiDoc() {
       title: "Signal Nodus",
       version: "0.3.0",
       description:
-        "SEC filing extraction, priced per call. Every route answers HTTP 402 " +
+        "What changed in a filing, priced per call. compare_filings returns a " +
+        "sentence-level year-over-year diff of any 10-K/10-Q item, pinned to " +
+        "accession numbers; the other routes are cheap on-ramps to it. Every route answers HTTP 402 " +
         "with an x402 challenge when no payment is presented; there is no " +
         "signup step to fail at, because settling the challenge issues the " +
         "credential. An MCP server over streamable HTTP is at " +
