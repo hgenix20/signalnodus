@@ -276,6 +276,13 @@ function isOwnHostname(hostname) {
 function apiResponse(request, url, env) {
   const contact = env.CONTACT_EMAIL || CONTACT_EMAIL_FALLBACK;
 
+  // Discovery documents on the host the endpoints actually live on. x402scan
+  // registration resolves the ORIGIN of a submitted endpoint URL and fetches
+  // its openapi.json from there, so serving these only on the apex made the
+  // API host unregisterable.
+  if (url.pathname === "/openapi.json") return json(openApiDoc());
+  if (url.pathname === "/.well-known/mcp.json") return json(mcpDescriptor());
+
   switch (url.pathname) {
     case "/":
       return json({
