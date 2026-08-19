@@ -15,6 +15,7 @@ import { Mppx, stripe as mppStripe } from "mppx/server";
 import { createFacilitatorConfig } from "@coinbase/x402";
 
 import {
+  toolWhoHolds,
   toolInstitutionalHoldings,
   toolInsiderTrades,
   toolLatestFilings,
@@ -222,6 +223,10 @@ const BAZAAR_INFO = {
     q: { company: "NVDA", item: "1A" },
     out: { summary: { added: 161, removed: 141, unchanged: 335, changeRatio: 0.325 }, added: ["..."], removed: ["..."] },
   },
+  "/v1/whoholds": {
+    q: { company: "NVDA", limit: "25" },
+    out: { company: "NVIDIA CORP", totalReportingManagers: 1253, holders: [{ manager: "McLaughlin Asset Management, Inc.", cik: "0002112239", filedAt: "2026-08-12" }] },
+  },
   "/v1/holdings": {
     q: { company: "Berkshire Hathaway", top: "10" },
     out: { manager: "BERKSHIRE HATHAWAY INC", distinctIssuers: 40, holdings: [{ issuer: "APPLE INC", valueUsd: 60000000000, pctOfPortfolio: 22.5 }] },
@@ -314,6 +319,7 @@ const ROUTES = {
   "/v1/latest": { tool: "latest_filings", run: toolLatestFilings },
   "/v1/insider": { tool: "insider_trades", run: toolInsiderTrades },
   "/v1/holdings": { tool: "institutional_holdings", run: toolInstitutionalHoldings },
+  "/v1/whoholds": { tool: "who_holds", run: toolWhoHolds },
 };
 
 export function isMppRoute(pathname) {

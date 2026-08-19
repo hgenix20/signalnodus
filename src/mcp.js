@@ -473,6 +473,25 @@ const TOOLS = [
     annotations: { readOnlyHint: true, openWorldHint: true },
   },
   {
+    name: "who_holds",
+    title: "Which institutions hold a stock",
+    description:
+      "Every 13F manager whose latest information table names the company: manager, CIK, " +
+      "filing date, accession number, plus the total count of reporting managers. The " +
+      "inverse of institutional_holdings; chain them to walk from a ticker to full parsed " +
+      `portfolios. Costs ${dollars(priceOf("who_holds"))} per call.`,
+    inputSchema: {
+      type: "object",
+      properties: {
+        company: COMPANY_PROP,
+        limit: { type: "integer", minimum: 1, maximum: 100, description: "Managers to return. Default 25." },
+      },
+      required: ["company"],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: true, openWorldHint: true },
+  },
+  {
     name: "institutional_holdings",
     title: "Parsed 13F holdings",
     description:
@@ -575,6 +594,8 @@ async function callTool(params, env, ctx, request) {
         return ok(await toolInsiderTrades(args, ctx));
       case "institutional_holdings":
         return ok(await toolInstitutionalHoldings(args, ctx));
+      case "who_holds":
+        return ok(await toolWhoHolds(args, ctx));
       default:
         throw new RpcError(JSON_RPC.INVALID_PARAMS, `unknown tool: ${name}`);
     }
@@ -1388,6 +1409,61 @@ export async function toolInstitutionalHoldings(args, ctx) {
     portfolioValueUsd: totalValue,
     holdings: holdings.slice(0, top),
     note: "Values are as-reported USD. Rows aggregated by issuer across sub-accounts. 13F reports long US-listed positions only: no shorts, no bonds, no foreign-only listings.",
+    _provenance: PROVENANCE,
+  };
+}
+
+// The inverse of institutional_holdings: which managers reported holding a
+// company. One EDGAR full-text query over 13F information tables; no filing
+// needs parsing because the hit metadata already names the manager.
+export async function toolWhoHolds(args, ctx) {
+  const cik = await resolveCik(args.company, ctx);
+  const sub = await fetchSubmissions(cik, ctx);
+  const issuerName = String(sub.name || "").toUpperCase().trim();
+  if (!issuerName) throw new ToolError("could not resolve the company's registered name");
+  const limit = Math.min(Math.max(parseInt(args.limit, 10) || 25, 1), 100);
+
+  // Current quarter's filings: 13Fs for a quarter arrive within 45 days of
+  // quarter end, so a 130-day window always covers one full reporting cycle.
+  const end = new Date();
+  const start = new Date(end.getTime() - 130 * 86400 * 1000);
+  const day = (d) => d.toISOString().slice(0, 10);
+
+  const url =
+    "https://efts.sec.gov/LATEST/search-index?q=" +
+    encodeURIComponent(`"${issuerName}"`) +
+    `&forms=13F-HR&startdt=${day(start)}&enddt=${day(end)}`;
+  const data = await secFetch(url, SUBMISSIONS_TTL, ctx, { 404: "full-text search unavailable" });
+
+  const hits = data?.hits?.hits || [];
+  const seen = new Set();
+  const holders = [];
+  for (const h of hits) {
+    const src = h?._source || {};
+    const name = (src.display_names || [])[0] || null;
+    const mcik = (src.ciks || [])[0] || null;
+    if (!mcik || seen.has(mcik)) continue;
+    seen.add(mcik);
+    holders.push({
+      manager: name ? name.replace(/\s*\(CIK \d+\)\s*$/, "") : null,
+      cik: mcik,
+      filedAt: src.file_date || null,
+      periodEnding: src.period_ending || null,
+      accessionNumber: src.adsh || null,
+    });
+    if (holders.length >= limit) break;
+  }
+
+  return {
+    company: sub.name || null,
+    companyCik: cik,
+    totalReportingManagers: data?.hits?.total?.value ?? null,
+    returned: holders.length,
+    holders,
+    note:
+      "Match is by the issuer's registered name inside 13F information tables over the last 130 days, " +
+      "so a manager appears once per filing that names the company. Position sizes are not in this " +
+      "answer; feed a manager into institutional_holdings for its full parsed portfolio.",
     _provenance: PROVENANCE,
   };
 }
