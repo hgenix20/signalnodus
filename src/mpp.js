@@ -15,6 +15,7 @@ import { Mppx, stripe as mppStripe } from "mppx/server";
 import { createFacilitatorConfig } from "@coinbase/x402";
 
 import {
+  toolInsiderTrades,
   toolLatestFilings,
   toolLookupCompany,
   toolRecentFilings,
@@ -220,6 +221,10 @@ const BAZAAR_INFO = {
     q: { company: "NVDA", item: "1A" },
     out: { summary: { added: 161, removed: 141, unchanged: 335, changeRatio: 0.325 }, added: ["..."], removed: ["..."] },
   },
+  "/v1/insider": {
+    q: { company: "NVDA", limit: "5" },
+    out: { company: "NVIDIA CORP", returned: 5, filings: [{ insider: "HUANG JEN HSUN", roles: ["officer","director"], transactions: [{ code: "S", meaning: "open-market sale", shares: 75000, pricePerShare: 181.32 }] }] },
+  },
   "/v1/latest": {
     q: { form: "8-K", limit: "20" },
     out: { form: "8-K", returned: 20, filings: [{ form: "8-K", company: "EXAMPLE CORP", accessionNumber: "0001234567-26-000123", items: [{ item: "1.01", title: "Entry into a Material Definitive Agreement" }] }] },
@@ -302,6 +307,7 @@ const ROUTES = {
   "/v1/section": { tool: "filing_section", run: toolFilingSection },
   "/v1/compare": { tool: "compare_filings", run: toolCompareFilings },
   "/v1/latest": { tool: "latest_filings", run: toolLatestFilings },
+  "/v1/insider": { tool: "insider_trades", run: toolInsiderTrades },
 };
 
 export function isMppRoute(pathname) {

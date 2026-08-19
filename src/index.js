@@ -716,6 +716,7 @@ service works before wiring payment; everything that does real work is priced.
 - recent_filings      ${price("recent_filings")}
 - company_financials  ${price("company_financials")}
 - filing_section      ${price("filing_section")}
+- insider_trades      ${price("insider_trades")}  parsed Form 4s: who traded, role, shares, price
 - latest_filings      ${price("latest_filings")}  market-wide live filing feed, built for polling
 - compare_filings     ${price("compare_filings")}
 
@@ -894,6 +895,10 @@ function openApiDoc() {
         q("form", "Form type, for example 10-K."),
         q("from_accession", "Older filing to compare from."),
         q("to_accession", "Newer filing to compare to."),
+      ]),
+      "/v1/insider": path("insider_trades", "A company's latest Form 4 filings parsed into insider transactions.", [
+        q("company", "Ticker or company name.", true),
+        q("limit", "Form 4 filings to parse, max 10."),
       ]),
       "/v1/latest": path("latest_filings", "Market-wide feed of filings as they land at EDGAR.", [
         q("form", "Filter to one form type, e.g. 8-K."),

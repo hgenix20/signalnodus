@@ -473,6 +473,25 @@ const TOOLS = [
     annotations: { readOnlyHint: true, openWorldHint: true },
   },
   {
+    name: "insider_trades",
+    title: "Parsed insider trades (Form 4)",
+    description:
+      "A company's latest Form 4 filings parsed into data: who traded, their role, " +
+      "buy or sell, shares, price, and holdings after. The free EDGAR servers list " +
+      "Form 4s; this one reads them. Every filing pinned by accession number. " +
+      `Costs ${dollars(priceOf("insider_trades"))} per call.`,
+    inputSchema: {
+      type: "object",
+      properties: {
+        company: COMPANY_PROP,
+        limit: { type: "integer", minimum: 1, maximum: 10, description: "Form 4 filings to parse. Default 5." },
+      },
+      required: ["company"],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: true, openWorldHint: true },
+  },
+  {
     name: "latest_filings",
     title: "Latest filings hitting EDGAR right now",
     description:
@@ -533,6 +552,8 @@ async function callTool(params, env, ctx, request) {
         return ok(await toolCompareFilings(args, ctx));
       case "latest_filings":
         return ok(await toolLatestFilings(args, ctx));
+      case "insider_trades":
+        return ok(await toolInsiderTrades(args, ctx));
       default:
         throw new RpcError(JSON_RPC.INVALID_PARAMS, `unknown tool: ${name}`);
     }
@@ -1157,6 +1178,107 @@ export async function toolLatestFilings(args, ctx) {
     asOf: (xml.match(/<updated>([^<]+)<\/updated>/) || [])[1] || null,
     filings,
     note: "Feed caches for 60 seconds. Poll faster than that and you get the cached answer for free upstream, but still pay per call.",
+    _provenance: PROVENANCE,
+  };
+}
+
+// Parsed insider trades: Form 4 as data instead of XML. The free EDGAR
+// servers list Form 4 filings; none parses them. The buyer this serves is
+// the trading agent, which per the seller leaderboard is where the paying
+// demand actually lives.
+export async function toolInsiderTrades(args, ctx) {
+  const cik = await resolveCik(args.company, ctx);
+  const sub = await fetchSubmissions(cik, ctx);
+  const count = Math.min(Math.max(parseInt(args.limit, 10) || 5, 1), 10);
+
+  const r = sub.filings?.recent || {};
+  const picks = [];
+  for (let i = 0; i < (r.form || []).length && picks.length < count; i++) {
+    if (r.form[i] === "4") {
+      picks.push({ acc: r.accessionNumber[i], doc: r.primaryDocument[i], date: r.filingDate[i] });
+    }
+  }
+  if (!picks.length) throw new ToolError(`no Form 4 filings found for CIK ${cik}`);
+
+  const CODES = {
+    P: "open-market purchase", S: "open-market sale", A: "grant or award",
+    M: "option exercise", F: "tax withholding", G: "gift", D: "disposition to issuer",
+    C: "conversion", X: "in-the-money option exercise", W: "acquisition or disposition by will",
+  };
+  const val = (block, tag) => {
+    // Plain string scanning instead of constructed regexes: a dynamic RegExp
+    // built from template strings already lost its backslashes once in this
+    // file's history, and indexOf cannot be mangled by an escaping layer.
+    const open = block.indexOf("<" + tag + ">");
+    if (open < 0) return null;
+    const close = block.indexOf("</" + tag + ">", open);
+    const v = block.indexOf("<value>", open);
+    if (v < 0 || (close > 0 && v > close)) return null;
+    const end = block.indexOf("</value>", v);
+    if (end < 0) return null;
+    return block.slice(v + 7, end).trim();
+  };
+  const flat = (block, tag) => {
+    const m = block.match(new RegExp(`<${tag}>([^<]*)</${tag}>`));
+    return m ? m[1].trim() : null;
+  };
+
+  const filings = [];
+  for (const f of picks) {
+    // The listed primaryDocument is the XSL-rendered HTML; the raw XML is the
+    // same filename without the xsl prefix.
+    const xmlName = f.doc.replace(/^xslF345X\d+\//, "");
+    const url = `https://www.sec.gov/Archives/edgar/data/${Number(cik)}/${f.acc.replace(/-/g, "")}/${xmlName}`;
+    let xml;
+    try {
+      xml = await secFetchText(url, SUBMISSIONS_TTL, ctx, { 404: "form 4 document not found" });
+    } catch {
+      filings.push({ accessionNumber: f.acc, filedAt: f.date, error: "could not fetch document" });
+      continue;
+    }
+
+    const ownerBlock = (xml.match(/<reportingOwner>[\s\S]*?<\/reportingOwner>/) || [""])[0];
+    const relBlock = (ownerBlock.match(/<reportingOwnerRelationship>[\s\S]*?<\/reportingOwnerRelationship>/) || [""])[0];
+    const roles = [];
+    if (flat(relBlock, "isDirector") === "1") roles.push("director");
+    if (flat(relBlock, "isOfficer") === "1") roles.push("officer");
+    if (flat(relBlock, "isTenPercentOwner") === "1") roles.push("10% owner");
+    const officerTitle = flat(relBlock, "officerTitle");
+
+    const transactions = [];
+    for (const t of xml.match(/<nonDerivativeTransaction>[\s\S]*?<\/nonDerivativeTransaction>/g) || []) {
+      const code = (t.match(/<transactionCode>([^<]*)<\/transactionCode>/) || [])[1] || null;
+      transactions.push({
+        security: val(t, "securityTitle"),
+        date: val(t, "transactionDate"),
+        code,
+        meaning: CODES[code] || null,
+        shares: Number(val(t, "transactionShares")) || null,
+        pricePerShare: Number(val(t, "transactionPricePerShare")) || null,
+        acquiredOrDisposed: val(t, "transactionAcquiredDisposedCode"),
+        sharesOwnedAfter: Number(val(t, "sharesOwnedFollowingTransaction")) || null,
+      });
+    }
+
+    filings.push({
+      accessionNumber: f.acc,
+      filedAt: f.date,
+      periodOfReport: flat(xml, "periodOfReport"),
+      insider: flat(ownerBlock, "rptOwnerName"),
+      insiderCik: flat(ownerBlock, "rptOwnerCik"),
+      roles,
+      ...(officerTitle ? { officerTitle } : {}),
+      transactions,
+      derivativeTransactionCount: (xml.match(/<derivativeTransaction>/g) || []).length,
+    });
+  }
+
+  return {
+    cik,
+    company: sub.name || null,
+    returned: filings.length,
+    filings,
+    note: "Non-derivative transactions parsed in full; derivative (options) transactions are counted, not expanded. Pass limit up to 10.",
     _provenance: PROVENANCE,
   };
 }
