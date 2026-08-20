@@ -2,8 +2,8 @@
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "ai.signalnodus/sec-filings",
   "title": "Signal Nodus SEC Filings",
-  "description": "Sentence-level YoY diffs of 10-K/10-Q sections, pinned to accession numbers. Pay per call x402.",
-  "version": "1.0.2",
+  "description": "SEC filing diffs, 8-K events, 13D stakes, insider trades, IPOs, federal contracts. Pay per call.",
+  "version": "1.1.0",
   "websiteUrl": "https://signalnodus.ai",
   "repository": {
     "url": "https://github.com/hgenix20/signalnodus",

@@ -890,9 +890,11 @@ function discoveryDoc() {
   return {
     name: "Signal Nodus",
     description:
-      "SEC filings API for AI agents: extract 10-K and 10-Q sections as clean text and diff them across years.",
-    source: "US SEC EDGAR",
-    scope: "US SEC filings only. No prices, news, non-US companies, or forecasts.",
+      "Market intelligence API for AI agents: SEC filing section diffs pinned to accession numbers, " +
+      "8-K events, 13D/13G stakes, insider trades, 13F holdings, IPO registrations, full-text EDGAR " +
+      "search, XBRL claim verification, US federal contracts and lobbying, plus market utilities.",
+    source: "Primary records: US SEC EDGAR, USAspending.gov, Senate LDA, ECB, public chain RPC",
+    scope: "US-listed companies and US federal data. No news, forecasts, opinion, or price history.",
     payment: {
       protocol: "MPP over HTTP 402",
       settles_via: "Stripe",
@@ -925,8 +927,9 @@ function mcpDescriptor() {
     description:
       "The diff is the product: sentence-level year-over-year comparison of SEC " +
       "10-K/10-Q sections, pinned to accession numbers so an amendment can never " +
-      "move a baseline. Free EDGAR servers exist for raw data; this one sells " +
-      "what changed.",
+      "move a baseline. Around it: 8-K events, 13D/13G stakes, insider trades, " +
+      "13F holdings, IPO registrations, full-text EDGAR search, XBRL claim " +
+      "verification, and US federal contracts and lobbying. Priced per call.",
     homepage: "https://signalnodus.ai",
     openapi: "https://signalnodus.ai/openapi.json",
     transports: [{ type: "streamable-http", url: "https://mcp.signalnodus.ai/" }],
