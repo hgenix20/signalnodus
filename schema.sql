@@ -24,3 +24,10 @@ CREATE TABLE IF NOT EXISTS usage (
 
 CREATE INDEX IF NOT EXISTS usage_subject_day ON usage (subject, day);
 CREATE INDEX IF NOT EXISTS usage_created ON usage (created_at);
+
+-- Stripe webhook deliveries already processed. Stripe retries webhooks, and
+-- crediting is additive, so each event id may credit exactly once.
+CREATE TABLE IF NOT EXISTS stripe_events (
+  event_id    TEXT PRIMARY KEY,
+  created_at  TEXT NOT NULL
+);

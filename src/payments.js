@@ -189,6 +189,29 @@ export async function handleWebhook(request, env) {
     return json({ error: "missing metadata" }, 400);
   }
 
+  // Stripe delivers at-least-once. Without an event-id ledger every
+  // redelivery of the same checkout re-runs the credit upsert below and the
+  // buyer gets free credit for one payment. Record the id first; if it was
+  // already recorded, this delivery is a duplicate and credits nothing.
+  const eventId = String(event.id || "");
+  if (eventId) {
+    try {
+      const seen = await env.BILLING.prepare(
+        "INSERT INTO stripe_events (event_id, created_at) VALUES (?, ?) ON CONFLICT(event_id) DO NOTHING",
+      )
+        .bind(eventId, new Date().toISOString())
+        .run();
+      if ((seen.meta?.changes ?? 1) === 0) {
+        return json({ received: true, duplicate: true });
+      }
+    } catch (err) {
+      // If the ledger itself is unavailable, crediting anyway risks a double
+      // credit on retry; 500 makes Stripe retry when the ledger is back.
+      console.error("could not record webhook event id", err);
+      return json({ error: "could not record event" }, 500);
+    }
+  }
+
   try {
     // Upsert rather than update. The pre-registered row can legitimately be
     // gone by now (pruned as an abandoned checkout, or never written because
@@ -207,7 +230,16 @@ export async function handleWebhook(request, env) {
       .run();
   } catch (err) {
     // Return non-2xx so Stripe retries rather than dropping a paid order.
+    // Release the event id first, or the retry would read as a duplicate
+    // and the buyer would never be credited.
     console.error("could not credit key", err);
+    if (eventId) {
+      try {
+        await env.BILLING.prepare("DELETE FROM stripe_events WHERE event_id = ?").bind(eventId).run();
+      } catch (cleanupErr) {
+        console.error("could not release webhook event id", cleanupErr);
+      }
+    }
     return json({ error: "could not credit" }, 500);
   }
 

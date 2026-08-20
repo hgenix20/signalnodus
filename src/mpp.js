@@ -366,18 +366,15 @@ export function isMppRoute(pathname) {
 export function describeRoutes() {
   return Object.entries(ROUTES).map(([path, r]) => ({
     path,
+    tool: r.tool,
     price: dollars(priceOf(r.tool)),
+    price_units_tenths_of_cent: priceOf(r.tool),
     rails: priceOf(r.tool) >= CARD_MINIMUM_UNITS
       ? ["stablecoin-tempo", "x402-base", "card"]
       : ["stablecoin-tempo", "x402-base"],
-    params:
-      path === "/v1/compare"
-        ? "company, item, form, from_accession, to_accession"
-        : path === "/v1/section"
-          ? "company, item, form, accession, max_chars"
-          : path === "/v1/financials"
-            ? "company, concept"
-            : "company, form, limit",
+    // Derived from the same example map Bazaar shoppers see, so the
+    // advertised params cannot drift from what the route actually takes.
+    params: Object.keys(BAZAAR_INFO[path]?.q || {}).join(", "),
   }));
 }
 
@@ -457,7 +454,12 @@ async function settleStandardX402(request, env, priceUnits, resourceUrl) {
   if (env.BASE_DEPOSIT_ADDRESS && String(auth.to).toLowerCase() !== String(env.BASE_DEPOSIT_ADDRESS).toLowerCase()) {
     return { failed: json({ error: "payment_invalid", detail: "authorization.to is not this service's receiving address" }, 402) };
   }
-  if (BigInt(auth.value || 0) < BigInt(wanted)) {
+  // The header is attacker-controlled; BigInt throws on anything non-numeric
+  // and nothing above the fetch handler catches, so validate before parsing.
+  if (!/^\d+$/.test(String(auth.value ?? ""))) {
+    return { failed: json({ error: "payment_invalid", detail: "authorization.value must be a decimal string of atomic USDC" }, 402) };
+  }
+  if (BigInt(auth.value) < BigInt(wanted)) {
     return { failed: json({ error: "payment_invalid", detail: `authorization.value below price; need ${wanted} atomic USDC` }, 402) };
   }
 
@@ -500,6 +502,19 @@ export async function handleMppRoute(request, env, ctx, url) {
   if (!route) return null;
 
   const price = priceOf(route.tool);
+
+  // Free tools serve directly. Composing a $0.00 challenge turned the
+  // documented proof-of-life call into a payment wall on the REST rail.
+  if (price === 0) {
+    try {
+      const args = Object.fromEntries(url.searchParams.entries());
+      const data = await route.run(args, ctx);
+      return json({ ...data, _paid: "$0.00" });
+    } catch (err) {
+      console.error("free call failed", route.tool, err);
+      return json({ error: "request_failed", detail: String(err?.message || err).slice(0, 300) }, 502);
+    }
+  }
 
   // Standard x402 clients first: verify and settle their X-PAYMENT against
   // the facilitator, serve on success, and say exactly why on failure.

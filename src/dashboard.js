@@ -459,14 +459,14 @@ function render({ money: m, usage, keys, health }) {
   const toolRows = (usage.byTool || [])
     .map(
       (t) =>
-        `<tr><td>${t.tool}</td><td class="num">${t.calls}</td><td class="num">${dollars(Number(t.charged || 0))}</td><td class="num dim">${dollars(priceOf(t.tool))}</td></tr>`,
+        `<tr><td>${esc(t.tool)}</td><td class="num">${t.calls}</td><td class="num">${dollars(Number(t.charged || 0))}</td><td class="num dim">${dollars(priceOf(t.tool))}</td></tr>`,
     )
     .join("");
 
   const keyRows = (keys.list || [])
     .map(
       (k) =>
-        `<tr><td>${k.label}</td><td class="num">${dollars(Number(k.credits || 0))}</td><td>${k.active ? "active" : "off"}</td><td class="dim">${String(k.last_used || "never").slice(0, 10)}</td></tr>`,
+        `<tr><td>${esc(k.label)}</td><td class="num">${dollars(Number(k.credits || 0))}</td><td>${k.active ? "active" : "off"}</td><td class="dim">${String(k.last_used || "never").slice(0, 10)}</td></tr>`,
     )
     .join("");
 

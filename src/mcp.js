@@ -307,13 +307,16 @@ async function dispatch(method, params, env, ctx, request) {
     case "tools/list":
       return {
         tools: TOOLS.map((t) => {
+          // Many descriptions already state their price; appending another
+          // line doubled it, and the blanket "no free tier" wording told
+          // agents the deliberately free proof-of-life call needed payment.
+          if (/Costs \$/.test(t.description)) return t;
           const price = priceOf(t.name);
-          return {
-            ...t,
-            description:
-              t.description +
-              ` Costs ${dollars(price)} per call. No subscription and no free tier: present a credit key or a machine payment.`,
-          };
+          const priceLine =
+            price === 0
+              ? " Free: no key and no payment needed. Use it to verify the service before paying."
+              : ` Costs ${dollars(price)} per call. No subscription: present a credit key or a machine payment.`;
+          return { ...t, description: t.description + priceLine };
         }),
       };
     case "tools/call":
@@ -1022,8 +1025,10 @@ export async function toolCompareFilings(args, ctx) {
     if (!args.from_accession || !args.to_accession) {
       throw new RpcError(JSON_RPC.INVALID_PARAMS, "pass both from_accession and to_accession, or neither");
     }
-    older = await resolveOne(cik, sub, { form: null, accession: args.from_accession }, ctx, "from_accession");
-    newer = await resolveOne(cik, sub, { form: null, accession: args.to_accession }, ctx, "to_accession");
+    // Pass the form through so a pinned accession of a different form is
+    // rejected here, not extracted against the wrong item catalog below.
+    older = await resolveOne(cik, sub, { form, accession: args.from_accession }, ctx, "from_accession");
+    newer = await resolveOne(cik, sub, { form, accession: args.to_accession }, ctx, "to_accession");
   } else {
     const matches = findFilings(sub, form, []);
     if (matches.length < 2) throw new ToolError(`need two ${form} filings to compare; found ${matches.length}`);

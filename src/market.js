@@ -67,8 +67,11 @@ export async function toolDomainReport(args, ctx) {
     }).catch(() => null);
 
   const rdapReq = getJson(`https://rdap.org/domain/${encodeURIComponent(domain)}`, ctx, 3600).catch(() => null);
+  const dmarcReq = getJson(`https://cloudflare-dns.com/dns-query?name=${encodeURIComponent(`_dmarc.${domain}`)}&type=TXT`, ctx, 300, {
+    accept: "application/dns-json",
+  }).catch(() => null);
 
-  const [a, aaaa, mx, txt, ns, rdap] = await Promise.all([doh("A"), doh("AAAA"), doh("MX"), doh("TXT"), doh("NS"), rdapReq]);
+  const [a, aaaa, mx, txt, ns, rdap, dmarc] = await Promise.all([doh("A"), doh("AAAA"), doh("MX"), doh("TXT"), doh("NS"), rdapReq, dmarcReq]);
   const answers = (r) => (r?.Answer || []).map((x) => x.data);
 
   let registered = null;
@@ -90,6 +93,7 @@ export async function toolDomainReport(args, ctx) {
   }
 
   const txtRecords = answers(txt);
+  const dmarcRecord = answers(dmarc).find((t) => t.replace(/^"|"$/g, "").startsWith("v=DMARC1")) || null;
   const ageDays = registered ? Math.floor((Date.now() - Date.parse(registered)) / 86400000) : null;
 
   return {
@@ -100,13 +104,14 @@ export async function toolDomainReport(args, ctx) {
     nameservers: answers(ns),
     mx: answers(mx),
     hasSpf: txtRecords.some((t) => t.includes("v=spf1")),
-    hasDmarc: false,
+    hasDmarc: Boolean(dmarcRecord),
+    dmarc: dmarcRecord,
     registered,
     ageDays,
     expires,
     registrar,
     rdapStatus: statuses,
-    note: "DNS via Cloudflare DoH; registration facts via RDAP, the registry's own record. DMARC requires a _dmarc lookup; see dmarc field on /v1/domain/report?dmarc=1.",
+    note: "DNS via Cloudflare DoH; registration facts via RDAP, the registry's own record.",
   };
 }
 

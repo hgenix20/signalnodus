@@ -619,7 +619,7 @@ EVM + market data $0.01 each</pre>
       <code>recent_filings</code>, <code>company_financials</code>,
       <code>filing_section</code>, and <code>compare_filings</code>. Clean section
       text and sentence-level year-over-year diffs, every result pinned to the
-      accession number it came from, so an amendment can never quietly move a
+      accession number it came from, so an amendment can never move a
       baseline you already computed.
     </p>
     <p class="sub">
@@ -859,13 +859,9 @@ function discoveryDoc() {
       alternative: "prepaid credit key, Authorization: Bearer <key>",
     },
     mcp: { url: "https://mcp.signalnodus.ai/", transport: "streamable-http" },
-    routes: [
-      route("/v1/company", "lookup_company", "company"),
-      route("/v1/filings", "recent_filings", "company, form, limit"),
-      route("/v1/financials", "company_financials", "company, concept"),
-      route("/v1/section", "filing_section", "company, item, form, accession, max_chars"),
-      route("/v1/compare", "compare_filings", "company, item, form, from_accession, to_accession"),
-    ],
+    // Derived from the live route table. A hand-maintained list here once
+    // hid 11 of 16 paid routes from everything that gates on this document.
+    routes: describeRoutes().map((r) => route(r.path, r.tool, r.params)),
     base_url: "https://api.signalnodus.ai",
     contact: "hgenix@agentmail.to",
   };
@@ -885,13 +881,9 @@ function mcpDescriptor() {
     homepage: "https://signalnodus.ai",
     openapi: "https://signalnodus.ai/openapi.json",
     transports: [{ type: "streamable-http", url: "https://mcp.signalnodus.ai/" }],
-    capabilities: [
-      "lookup_company",
-      "recent_filings",
-      "company_financials",
-      "filing_section",
-      "compare_filings",
-    ],
+    // Every registered tool; a hand list here once hid 11 of 16 from
+    // directories that gate on this descriptor.
+    capabilities: Object.keys(PRICING),
     payment: {
       protocols: ["x402", "mpp"],
       networks: ["eip155:8453"],
@@ -1112,7 +1104,7 @@ years of convergence can mean stable boilerplate rather than low risk.</p>`,
     title: "Why agents stop at your x402 paywall: three compatibility walls, measured",
     date: "2026-08-19",
     summary:
-      "We instrumented the stock x402 client against our own 402 flow and found three silent failure walls. Fixing them took a day; finding them took real buyer traffic going nowhere.",
+      "We instrumented the stock x402 client against our own 402 flow and found three failure walls, none of which reported an error. Fixing them took a day; finding them took real buyer traffic going nowhere.",
     body: `
 <p>Our payment funnel showed a pattern that will be familiar to new x402
 sellers: agents arriving from directories, walking the catalog, requesting
@@ -1120,7 +1112,7 @@ paid routes repeatedly, and never settling. The usual reading is "no funded
 wallets" or "price too high". Before accepting that, we ran the stock client
 (x402-fetch, the library Coinbase's own quickstarts hand every buyer) against
 our own endpoints with a throwaway key, and logged every step. It hit three
-separate walls, each of which failed <em>silently</em>.</p>
+separate walls, and none of them reported an error.</p>
 
 <h3>Wall 1: the challenge payload was only in a header</h3>
 <p>Our 402 carried the payment options in the <code>PAYMENT-REQUIRED</code>
@@ -1148,7 +1140,7 @@ logs was an agent paying into that wall.</p>
 <p>Fix: parse v1 <code>X-PAYMENT</code> directly, verify and settle against
 the facilitator before the middleware sees the request, serve only after
 settlement, return the receipt in <code>X-PAYMENT-RESPONSE</code>, and put a
-reason in the body of every rejected payment. The silent re-challenge was
+reason in the body of every rejected payment. The wordless re-challenge was
 half the bug: a buyer that is told <em>why</em> can fix its side.</p>
 
 <h3>How to test your own paywall in five minutes</h3>
@@ -1178,15 +1170,15 @@ a buyer actually needs. Until something does, run the five-minute test.</p>`,
 <p>EDGAR is content-addressed by accident of regulation: an amendment gets its
 own accession number rather than overwriting the filing it amends. Most
 tooling ignores this and serves "the latest version", which means an amended
-10-K can silently rewrite data your analysis thought it saw at the time, and
+10-K can rewrite data your analysis thought it saw at the time with nothing flagging the change, and
 you find out much later, if at all.</p>
 <p>Everything this service returns can be pinned to an exact accession number.
 A diff computed last quarter still means the same thing this quarter, and a
 backtest that keys off anything fundamental stays point-in-time honest: the
-past cannot be quietly revised to flatter the present.</p>
+past cannot be revised after the fact to flatter the present.</p>
 <p>The failure this prevents is not hypothetical. The first user who described
 their EDGAR workflow to us reported that the server they used "served the
-latest amendment, silently invalidating my baseline", and that pinning alone
+latest amendment, invalidating my baseline with no warning", and that pinning alone
 would have saved them a week of baseline-tracking. That sentence is the
 product.</p>`,
   },

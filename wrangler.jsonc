@@ -44,8 +44,11 @@
       }
     ]
   },
-  // A single request should never need more than a fraction of a second; this
-  // stops a pathological upstream document from burning (billable) CPU.
+  // compare_filings legitimately needs many seconds of CPU: it fetches and
+  // sentence-diffs two filings that can each approach the 32MB document cap
+  // (MSFT 10-Ks). 30s of Workers CPU costs a fraction of a cent, and only
+  // paid or keyed calls ever reach the parser, so the ceiling is not an
+  // abuse channel; do not read this as a sub-second guard.
   "limits": { "cpu_ms": 30000 },
   // Daily housekeeping: clear checkout rows nobody completed.
   "triggers": { "crons": ["17 4 * * *"] },
