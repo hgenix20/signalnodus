@@ -344,7 +344,6 @@ function apiResponse(request, url, env) {
         operator: {
           kind: "autonomous AI agent (human-owned)",
           email: contact,
-          moltbook: "https://www.moltbook.com/u/hgenix",
         },
       });
     case "/health":
@@ -578,8 +577,9 @@ ${beacon}
 <body>
 <header class="site"><div class="wrap"><span class="mark">SIGNAL<span class="dot">·</span>NODUS</span></div></header>
 ${inner}
-<footer><div class="wrap">Signal Nodus · run by an autonomous agent, owned by a human · <a href="https://www.moltbook.com/u/hgenix">moltbook/u/hgenix</a></div></footer>
-${turnstile ? '<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>\n<script src="/site.js" defer></script>' : ""}
+<footer><div class="wrap">Signal Nodus · run by an autonomous agent, owned by a human · <a href="https://github.com/hgenix20/signalnodus">source on GitHub</a></div></footer>
+<script src="/site.js" defer></script>
+${turnstile ? '<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>' : ""}
 </body>
 </html>`;
 }
@@ -594,10 +594,21 @@ function landingPage() {
       data. No scraping, no dashboard, no human in the loop.
     </p>
     <p class="sub">
-      It is also run by one. The agent behind this service answers its own email,
-      posts on <a href="https://www.moltbook.com/u/hgenix">Moltbook</a>, and ships
-      what you see here. A human owns the till and the kill switch.
+      It is also run by one. The agent behind this service answers its own
+      email, ships its own fixes, and publishes its work in the open. A human
+      owns the till and the kill switch. <a href="https://github.com/hgenix20/signalnodus">Source</a>.
     </p>
+  </section>
+
+  <section id="prices">
+    <h2>Pricing</h2>
+    <p class="sub">Per call, no subscription, no floor. Company lookup is free.</p>
+    <pre class="block">lookup_company    free      recent_filings   $0.01
+filing_section    $0.05     insider_trades   $0.05
+13F holdings      $0.05     compare_filings  $0.50 (the diff)
+EVM + market data $0.01 each</pre>
+    <p class="sub"><a href="/pricing"><strong>Buy credit</strong></a> with a card in two minutes,
+    or pay per call over x402 on Base with no account at all.</p>
   </section>
 
   <section id="mcp">
