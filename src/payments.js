@@ -14,6 +14,11 @@ import { hashKey, dollars, priceOf } from "./billing.js";
 // Bonus credit on the larger packs is the volume discount. Compare against an
 // incumbent charging $239/mo before you may extract a section at all.
 export const PACKS = {
+  // Sized under the stock x402 client's default per-payment safety cap of
+  // 0.1 USDC, discovered when the client refused the $9 pack before signing.
+  // A default-configured agent can buy this one without touching a setting;
+  // every larger pack requires the buyer to raise its own cap.
+  taste: { cents: 9, units: 100, label: "Taste" },
   starter: { cents: 900, units: 10_000, label: "Starter" },
   builder: { cents: 3900, units: 45_000, label: "Builder" },
   scale: { cents: 14_900, units: 190_000, label: "Scale" },

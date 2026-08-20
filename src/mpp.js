@@ -610,6 +610,34 @@ async function handleCreditPurchase(request, env, url, ctx) {
     );
   }
 
+  // Charge the pack price. Every pack clears the card floor, so both rails are
+  // offered and the caller picks whichever it can settle.
+  const units = Math.round((pack.cents / 100) * UNITS_PER_DOLLAR);
+
+  // Standard x402 clients first, same as the data routes. This lane is the
+  // whole autonomous-onboarding pitch, and it was the one route the standard
+  // payment fix skipped: a stock client buying a key still paid into the
+  // wall. Settle-first, then mint; the key exists only after money moved.
+  const std = await settleStandardX402(request, env, Math.round(pack.cents * 10), url.toString());
+  if (std?.failed) {
+    ctx?.waitUntil?.(logChallenge(env, "credit_purchase", request));
+    return std.failed;
+  }
+  if (std?.receipt) {
+    const key = await mintKey(env, pack.units, `x402:${packId}:${std.receipt.payer || "unknown"}`);
+    ctx?.waitUntil?.(logSettled(env, "credit_purchase", request, Math.round(pack.cents * 10)));
+    return withPaymentResponse(
+      json({
+        api_key: key,
+        credit: dollars(pack.units),
+        pack: packId,
+        usage: "Send as Authorization: Bearer <key>. Balance at https://signalnodus.ai/api/balance.",
+        receipt: std.receipt,
+      }),
+      std.receipt,
+    );
+  }
+
   const mppx = await getMppx(env);
   if (!mppx) {
     return json(
@@ -621,10 +649,6 @@ async function handleCreditPurchase(request, env, url, ctx) {
       503,
     );
   }
-
-  // Charge the pack price. Every pack clears the card floor, so both rails are
-  // offered and the caller picks whichever it can settle.
-  const units = Math.round((pack.cents / 100) * UNITS_PER_DOLLAR);
 
   let paid;
   try {
