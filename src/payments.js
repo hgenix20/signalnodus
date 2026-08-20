@@ -25,8 +25,11 @@ export function packSummary() {
     label: p.label,
     price: `$${(p.cents / 100).toFixed(2)}`,
     credits: dollars(p.units),
-    diffs: Math.floor(p.units / 250),
-    sections: Math.floor(p.units / 50),
+    // Derived from the live price table, so a price change can never leave
+    // the packs advertising counts the credit cannot buy. The hardcoded 250
+    // here dated from an early draft price and overstated every pack by 2x.
+    diffs: Math.floor(p.units / priceOf("compare_filings")),
+    sections: Math.floor(p.units / priceOf("filing_section")),
   }));
 }
 
