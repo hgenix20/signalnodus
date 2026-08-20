@@ -24,7 +24,14 @@ import {
   toolCompanyFinancials,
   toolFilingSection,
   toolCompareFilings,
+  toolEdgarSearch,
+  toolFilingEvents,
+  toolActivistStakes,
+  toolIpoPipeline,
+  toolRiskChurnScore,
+  toolVerifyFinancialClaim,
 } from "./mcp.js";
+import { toolGovernmentContracts, toolLobbying } from "./govdata.js";
 import { priceOf, dollars, UNITS_PER_DOLLAR } from "./billing.js";
 import { PACKS, mintKey } from "./payments.js";
 import { toolEvmBalance, toolEvmGas, toolEvmReceipt, toolTokenPrice } from "./onchain.js";
@@ -269,6 +276,38 @@ const BAZAAR_INFO = {
     q: { q: "fed", limit: "5" },
     out: { returned: 5, markets: [{ question: "Fed rate cut in September?", outcomePrices: [0.62, 0.38], volumeUsd: 1234567.0 }] },
   },
+  "/v1/search": {
+    q: { q: "material weakness", forms: "10-K", limit: "10" },
+    out: { totalHits: 1042, hits: [{ company: "EXAMPLE CORP", cik: "0001234567", form: "10-K", filedAt: "2026-02-20", accessionNumber: "0001234567-26-000012" }] },
+  },
+  "/v1/events": {
+    q: { company: "NVDA", item: "5.02", limit: "5" },
+    out: { company: "NVIDIA CORP", returned: 1, events: [{ form: "8-K", eventDate: "2026-04-27", items: [{ item: "5.02", title: "Departure/Election of Directors or Officers; Compensatory Arrangements" }] }] },
+  },
+  "/v1/activists": {
+    q: { company: "NVDA", days: "365", limit: "10" },
+    out: { company: "NVIDIA CORP", returned: 3, stakes: [{ form: "SC 13G/A", filers: ["VANGUARD GROUP INC"], filedAt: "2026-02-13", accessionNumber: "0001102934-26-000101" }] },
+  },
+  "/v1/ipos": {
+    q: { limit: "10" },
+    out: { returned: 10, filings: [{ form: "S-1", company: "EXAMPLE TECH INC", cik: "0001234567", filedAt: "2026-08-19T17:02:11-04:00" }] },
+  },
+  "/v1/gov/contracts": {
+    q: { company: "Lockheed Martin", days: "365", limit: "5" },
+    out: { returned: 5, awards: [{ awardId: "N0001926C0001", recipient: "LOCKHEED MARTIN CORP", amountUsd: 1250000000, agency: "Department of Defense" }] },
+  },
+  "/v1/gov/lobbying": {
+    q: { company: "Apple", limit: "5" },
+    out: { totalFilings: 214, filings: [{ registrant: "Example Strategies LLC", client: "Apple Inc.", incomeUsd: 120000, issues: ["Taxation"], year: 2026 }] },
+  },
+  "/v1/score/churn": {
+    q: { company: "NVDA", item: "1A" },
+    out: { churnPercent: 4.8, verdict: "typical", sentencesAdded: 15, sentencesRemoved: 15, from: { accession: "..." }, to: { accession: "..." } },
+  },
+  "/v1/verify/claim": {
+    q: { company: "AAPL", concept: "Revenues", claimed_value: "391035000000", fiscal_year: "2024" },
+    out: { verdict: "supported", actualValue: 391035000000, diffPercent: 0, citation: { accessionNumber: "0000320193-24-000123", form: "10-K" } },
+  },
   "/v1/credit": {
     q: { pack: "starter" },
     out: { api_key: "sn_live_...", credit: "$10.00", note: "settling the 402 IS the registration; no account exists" },
@@ -357,6 +396,14 @@ const ROUTES = {
   "/v1/insider": { tool: "insider_trades", run: toolInsiderTrades },
   "/v1/holdings": { tool: "institutional_holdings", run: toolInstitutionalHoldings },
   "/v1/whoholds": { tool: "who_holds", run: toolWhoHolds },
+  "/v1/search": { tool: "edgar_search", run: toolEdgarSearch },
+  "/v1/events": { tool: "filing_events", run: toolFilingEvents },
+  "/v1/activists": { tool: "activist_stakes", run: toolActivistStakes },
+  "/v1/ipos": { tool: "ipo_pipeline", run: toolIpoPipeline },
+  "/v1/gov/contracts": { tool: "government_contracts", run: toolGovernmentContracts },
+  "/v1/gov/lobbying": { tool: "lobbying", run: toolLobbying },
+  "/v1/score/churn": { tool: "risk_churn_score", run: toolRiskChurnScore },
+  "/v1/verify/claim": { tool: "verify_financial_claim", run: toolVerifyFinancialClaim },
 };
 
 export function isMppRoute(pathname) {

@@ -7,6 +7,7 @@
 // Spec: https://modelcontextprotocol.io/specification/2025-06-18
 
 import { htmlToText, extractItem, diffSections, itemCatalog, knownItem } from "./filings.js";
+import { toolGovernmentContracts, toolLobbying, GovError } from "./govdata.js";
 import { toolEvmBalance, toolEvmGas, toolEvmReceipt, toolTokenPrice } from "./onchain.js";
 import { toolFxRate, toolDomainReport, toolPredictionMarkets } from "./market.js";
 import { authorize, paymentRequired, priceOf, dollars } from "./billing.js";
@@ -667,6 +668,162 @@ const TOOLS = [
     },
     annotations: { readOnlyHint: true, openWorldHint: true },
   },
+  {
+    name: "edgar_search",
+    title: "Search all SEC filings",
+    description:
+      "Exact-phrase full-text search over every EDGAR filing since 2001. Returns the company, " +
+      "form, date, and accession number of each hit, ready to feed into filing_section or " +
+      "compare_filings. Costs $0.01 per call.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        q: { type: "string", description: "Exact phrase to search for, 2-200 characters." },
+        forms: { type: "string", description: "Optional comma list of form types, e.g. 10-K,8-K." },
+        from: { type: "string", description: "Optional start date, YYYY-MM-DD." },
+        to: { type: "string", description: "Optional end date, YYYY-MM-DD." },
+        limit: { type: "integer", description: "Hits to return, max 50. Default 10." },
+      },
+      required: ["q"],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: true, openWorldHint: true },
+  },
+  {
+    name: "filing_events",
+    title: "8-K material events",
+    description:
+      "A company's 8-K filings parsed into material events with decoded item codes: executive " +
+      "departures (5.02), restatements (4.02), acquisitions (2.01), cybersecurity incidents " +
+      "(1.05), and the rest. eventDate is when it happened, filedAt when it was disclosed. " +
+      "Costs $0.05 per call.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        company: COMPANY_PROP,
+        item: { type: "string", description: "Optional item-code filter, e.g. 5.02." },
+        limit: { type: "integer", description: "Events to return, max 25. Default 10." },
+        include_amendments: { type: "boolean", description: "Also include 8-K/A amendments." },
+      },
+      required: ["company"],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: true, openWorldHint: true },
+  },
+  {
+    name: "activist_stakes",
+    title: "13D/13G stakes in a company",
+    description:
+      "Schedule 13D and 13G beneficial-ownership filings naming a company over a window, newest " +
+      "first. A fresh 13D is the standard first public signal of an activist position. " +
+      "Costs $0.05 per call.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        company: COMPANY_PROP,
+        days: { type: "integer", description: "Lookback window in days, 30-730. Default 365." },
+        limit: { type: "integer", description: "Filings to return, max 100. Default 25." },
+      },
+      required: ["company"],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: true, openWorldHint: true },
+  },
+  {
+    name: "ipo_pipeline",
+    title: "New IPO registrations",
+    description:
+      "New S-1 and F-1 registration statements as they land at EDGAR, market-wide and newest " +
+      "first: the earliest public signal of a US IPO. Costs $0.01 per call.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        limit: { type: "integer", description: "Filings to return, max 40. Default 20." },
+        include_amendments: { type: "boolean", description: "Also include S-1/A and F-1/A." },
+      },
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: true, openWorldHint: true },
+  },
+  {
+    name: "government_contracts",
+    title: "US federal contract awards",
+    description:
+      "Federal prime contract awards to a company from USAspending.gov, largest first: award id, " +
+      "amount, agency, and period. Recipient match is by name text. Costs $0.05 per call.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        company: { type: "string", description: "Recipient name, e.g. Lockheed Martin." },
+        days: { type: "integer", description: "Lookback window in days, 30-1825. Default 365." },
+        limit: { type: "integer", description: "Awards to return, max 25. Default 10." },
+      },
+      required: ["company"],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: true, openWorldHint: true },
+  },
+  {
+    name: "lobbying",
+    title: "US lobbying disclosures",
+    description:
+      "US Senate LDA lobbying disclosures for a client company, newest first: registrant, " +
+      "reported income or in-house expenses, and issue areas. Costs $0.05 per call.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        company: { type: "string", description: "Client company name, e.g. Apple." },
+        year: { type: "integer", description: "Optional filing year filter." },
+        limit: { type: "integer", description: "Filings to return, max 25. Default 10." },
+      },
+      required: ["company"],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: true, openWorldHint: true },
+  },
+  {
+    name: "risk_churn_score",
+    title: "Risk-factor churn score",
+    description:
+      "One decision number: how much of a filing item was rewritten year over year, as a percent " +
+      "with a verdict band (routine, typical, elevated, major rewrite). Built on the same " +
+      "sentence-level diff as compare_filings; buy that when you need the passages themselves. " +
+      "Costs $0.10 per call.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        company: COMPANY_PROP,
+        item: { type: "string", description: "Item identifier. Default 1A (risk factors)." },
+        form: { type: "string", description: "10-K or 10-Q. Default 10-K." },
+      },
+      required: ["company"],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: true, openWorldHint: true },
+  },
+  {
+    name: "verify_financial_claim",
+    title: "Verify a financial claim",
+    description:
+      "Deterministic check of a numeric claim against the company's own XBRL as filed with the " +
+      "SEC. Returns supported, contradicted, or unverifiable, with the as-reported value and the " +
+      "accession number to cite. Costs $0.10 per call.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        company: COMPANY_PROP,
+        concept: { type: "string", description: "XBRL concept, e.g. Revenues or NetIncomeLoss." },
+        claimed_value: { type: "number", description: "The value the claim asserts, in the concept's unit." },
+        fiscal_year: { type: "integer", description: "Fiscal year of the claim, e.g. 2025." },
+        fiscal_period: { type: "string", description: "FY, Q1, Q2, Q3, or Q4. Default FY." },
+        end: { type: "string", description: "Alternative to fiscal_year: exact period end date, YYYY-MM-DD." },
+        tolerance_pct: { type: "number", description: "Match tolerance in percent. Default 0.5." },
+      },
+      required: ["company", "concept", "claimed_value"],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: true, openWorldHint: true },
+  },
 ];
 
 async function callTool(params, env, ctx, request) {
@@ -729,12 +886,28 @@ async function callTool(params, env, ctx, request) {
         return ok(await toolInstitutionalHoldings(args, ctx));
       case "who_holds":
         return ok(await toolWhoHolds(args, ctx));
+      case "edgar_search":
+        return ok(await toolEdgarSearch(args, ctx));
+      case "filing_events":
+        return ok(await toolFilingEvents(args, ctx));
+      case "activist_stakes":
+        return ok(await toolActivistStakes(args, ctx));
+      case "ipo_pipeline":
+        return ok(await toolIpoPipeline(args, ctx));
+      case "government_contracts":
+        return ok(await toolGovernmentContracts(args, ctx));
+      case "lobbying":
+        return ok(await toolLobbying(args, ctx));
+      case "risk_churn_score":
+        return ok(await toolRiskChurnScore(args, ctx));
+      case "verify_financial_claim":
+        return ok(await toolVerifyFinancialClaim(args, ctx));
       default:
         throw new RpcError(JSON_RPC.INVALID_PARAMS, `unknown tool: ${name}`);
     }
   } catch (err) {
     if (err instanceof RpcError) throw err;
-    if (err instanceof ToolError) return toolError(err.message);
+    if (err instanceof ToolError || err instanceof GovError) return toolError(err.message);
     console.error("tool failure", name, err);
     return toolError("upstream request failed");
   }
@@ -1600,6 +1773,366 @@ export async function toolWhoHolds(args, ctx) {
       "so a manager appears once per filing that names the company. Position sizes are not in this " +
       "answer; feed a manager into institutional_holdings for its full parsed portfolio.",
     _provenance: PROVENANCE,
+  };
+}
+
+// ---------------------------------------------------------- 8-K events
+
+// Item codes from the SEC's 8-K instructions. The submissions index carries
+// the raw codes per filing; the titles make them actionable without a lookup.
+const ITEM_8K = {
+  "1.01": "Entry into a Material Definitive Agreement",
+  "1.02": "Termination of a Material Definitive Agreement",
+  "1.03": "Bankruptcy or Receivership",
+  "1.04": "Mine Safety - Reporting of Shutdowns and Patterns of Violations",
+  "1.05": "Material Cybersecurity Incidents",
+  "2.01": "Completion of Acquisition or Disposition of Assets",
+  "2.02": "Results of Operations and Financial Condition",
+  "2.03": "Creation of a Direct Financial Obligation",
+  "2.04": "Triggering Events That Accelerate or Increase a Direct Financial Obligation",
+  "2.05": "Costs Associated with Exit or Disposal Activities",
+  "2.06": "Material Impairments",
+  "3.01": "Notice of Delisting or Failure to Satisfy a Continued Listing Rule",
+  "3.02": "Unregistered Sales of Equity Securities",
+  "3.03": "Material Modification to Rights of Security Holders",
+  "4.01": "Changes in Registrant's Certifying Accountant",
+  "4.02": "Non-Reliance on Previously Issued Financial Statements",
+  "5.01": "Changes in Control of Registrant",
+  "5.02": "Departure/Election of Directors or Officers; Compensatory Arrangements",
+  "5.03": "Amendments to Articles of Incorporation or Bylaws; Change in Fiscal Year",
+  "5.04": "Temporary Suspension of Trading Under Employee Benefit Plans",
+  "5.05": "Amendments to the Code of Ethics",
+  "5.06": "Change in Shell Company Status",
+  "5.07": "Submission of Matters to a Vote of Security Holders",
+  "5.08": "Shareholder Director Nominations",
+  "7.01": "Regulation FD Disclosure",
+  "8.01": "Other Events",
+  "9.01": "Financial Statements and Exhibits",
+};
+
+export async function toolFilingEvents(args, ctx) {
+  const cik = await resolveCik(args.company, ctx);
+  const sub = await fetchSubmissions(cik, ctx);
+  const limit = Math.min(Math.max(parseInt(args.limit, 10) || 10, 1), 25);
+  const wanted = args.item ? String(args.item).trim() : null;
+  const includeAmendments = args.include_amendments === true || args.include_amendments === "true";
+
+  const recent = sub?.filings?.recent;
+  if (!recent || !Array.isArray(recent.accessionNumber)) {
+    throw new ToolError("no filing index available for this company");
+  }
+
+  const events = [];
+  for (let i = 0; i < recent.accessionNumber.length && events.length < limit; i++) {
+    const form = str(recent.form?.[i]).toUpperCase();
+    if (form !== "8-K" && !(includeAmendments && form === "8-K/A")) continue;
+    const codes = str(recent.items?.[i]).split(",").map((x) => x.trim()).filter(Boolean);
+    if (wanted && !codes.includes(wanted)) continue;
+    events.push({
+      form,
+      accessionNumber: str(recent.accessionNumber[i]),
+      // reportDate on an 8-K is the date of the event itself, not the filing.
+      eventDate: str(recent.reportDate?.[i]) || null,
+      filedAt: str(recent.filingDate?.[i]) || null,
+      items: codes.map((c) => ({ item: c, title: ITEM_8K[c] || null })),
+      primaryDocument: str(recent.primaryDocument?.[i]) || null,
+    });
+  }
+
+  return {
+    cik,
+    company: clean(sub.name),
+    itemFilter: wanted,
+    returned: events.length,
+    events,
+    note:
+      "8-K material events with decoded item codes, newest first. eventDate is when the event " +
+      "happened; filedAt is when the company disclosed it. Filter by item to watch one event " +
+      "type, e.g. 5.02 for executive departures or 4.02 for restatements.",
+  };
+}
+
+// ------------------------------------------------------- full-text search
+
+export async function toolEdgarSearch(args, ctx) {
+  const q = String(args.q || "").trim();
+  if (q.length < 2 || q.length > 200) {
+    throw new RpcError(JSON_RPC.INVALID_PARAMS, "q must be 2-200 characters");
+  }
+  const limit = Math.min(Math.max(parseInt(args.limit, 10) || 10, 1), 50);
+  const forms = args.forms ? String(args.forms).toUpperCase().replace(/[^A-Z0-9,/ -]/g, "").slice(0, 80) : "";
+  const day = /^\d{4}-\d{2}-\d{2}$/;
+  const startdt = day.test(String(args.from || "")) ? String(args.from) : null;
+  const enddt = day.test(String(args.to || "")) ? String(args.to) : null;
+
+  let url = "https://efts.sec.gov/LATEST/search-index?q=" + encodeURIComponent(`"${q.replace(/"/g, "")}"`);
+  if (forms) url += `&forms=${encodeURIComponent(forms)}`;
+  if (startdt) url += `&startdt=${startdt}`;
+  if (enddt) url += `&enddt=${enddt}`;
+
+  const data = await secFetch(url, 300, ctx, { 404: "full-text search unavailable" });
+  const hits = (data?.hits?.hits || []).slice(0, limit).map((h) => {
+    const src = h?._source || {};
+    return {
+      company: String((src.display_names || [])[0] || "").replace(/\s*\(CIK \d+\)\s*$/, "") || null,
+      cik: (src.ciks || [])[0] || null,
+      form: (src.root_forms || [])[0] || src.file_type || null,
+      filedAt: src.file_date || null,
+      accessionNumber: src.adsh || null,
+    };
+  });
+
+  return {
+    query: q,
+    forms: forms || "all",
+    totalHits: data?.hits?.total?.value ?? null,
+    returned: hits.length,
+    hits,
+    note:
+      "Exact-phrase full-text search over EDGAR filings since 2001. Feed an accessionNumber into " +
+      "filing_section or compare_filings to read what matched.",
+  };
+}
+
+// -------------------------------------------------------- activist stakes
+
+export async function toolActivistStakes(args, ctx) {
+  const cik = await resolveCik(args.company, ctx);
+  const sub = await fetchSubmissions(cik, ctx);
+  const issuerName = String(sub.name || "").toUpperCase().trim();
+  if (!issuerName) throw new ToolError("could not resolve the company's registered name");
+  const limit = Math.min(Math.max(parseInt(args.limit, 10) || 25, 1), 100);
+  const days = Math.min(Math.max(parseInt(args.days, 10) || 365, 30), 730);
+
+  const end = new Date();
+  const start = new Date(end.getTime() - days * 86400 * 1000);
+  const day = (d) => d.toISOString().slice(0, 10);
+
+  // EDGAR has used both "SC 13D" and "SCHEDULE 13D" naming; ask for both and
+  // let the index ignore whichever it does not know.
+  const forms = "SC 13D,SC 13G,SC 13D/A,SC 13G/A,SCHEDULE 13D,SCHEDULE 13G,SCHEDULE 13D/A,SCHEDULE 13G/A";
+  const url =
+    "https://efts.sec.gov/LATEST/search-index?q=" +
+    encodeURIComponent(`"${issuerName}"`) +
+    `&forms=${encodeURIComponent(forms)}&startdt=${day(start)}&enddt=${day(end)}`;
+  const data = await secFetch(url, SUBMISSIONS_TTL, ctx, { 404: "full-text search unavailable" });
+
+  const stakes = [];
+  for (const h of data?.hits?.hits || []) {
+    if (stakes.length >= limit) break;
+    const src = h?._source || {};
+    const names = (src.display_names || []).map((n) => String(n).replace(/\s*\(CIK \d+\)\s*$/, ""));
+    const ciks = src.ciks || [];
+    // The subject company appears alongside the holder; report the other parties.
+    const filers = names.filter((_, i) => ciks[i] !== cik);
+    stakes.push({
+      form: (src.root_forms || [])[0] || src.file_type || null,
+      filers: filers.length ? filers : names,
+      filedAt: src.file_date || null,
+      accessionNumber: src.adsh || null,
+    });
+  }
+
+  return {
+    company: sub.name || null,
+    companyCik: cik,
+    windowDays: days,
+    totalHits: data?.hits?.total?.value ?? null,
+    returned: stakes.length,
+    stakes,
+    note:
+      "Schedule 13D (active intent) and 13G (passive) beneficial-ownership filings naming this " +
+      "company, newest first. A new 13D is the standard first public signal of an activist " +
+      "position; amendments track stake changes. Match is by registered name in the filing text.",
+  };
+}
+
+// ----------------------------------------------------------- IPO pipeline
+
+async function fetchCurrentFeed(form, ctx) {
+  const feedUrl =
+    "https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent" +
+    `&type=${encodeURIComponent(form)}&company=&dateb=&owner=include&count=40&output=atom`;
+
+  const cache = caches.default;
+  const cacheKey = new Request(feedUrl);
+  let res = await cache.match(cacheKey);
+  if (!res) {
+    res = await fetch(feedUrl, { headers: { "user-agent": SEC_USER_AGENT } });
+    if (!res.ok) throw new ToolError(`SEC current-filings feed returned ${res.status}`);
+    res = new Response(await res.text(), {
+      headers: { "cache-control": "public, max-age=60", "content-type": "application/atom+xml" },
+    });
+    ctx?.waitUntil?.(cache.put(cacheKey, res.clone()));
+  }
+  const xml = await res.text();
+
+  const filings = [];
+  const entries = xml.split("<entry>").slice(1);
+  for (const e of entries) {
+    const grab = (re) => (e.match(re) || [])[1] || null;
+    const title = decodeEntitiesLocal(grab(/<title>([\s\S]*?)<\/title>/) || "");
+    const m = title.match(/^(\S+)\s+-\s+(.*?)\s+\((\d{10})\)/);
+    const acc = grab(/accession-number=([0-9-]+)/);
+    const items = [...e.matchAll(/Item\s+([\d.]+):\s*([^&<]+)/g)].map((x) => ({
+      item: x[1],
+      title: x[2].trim(),
+    }));
+    filings.push({
+      form: m ? m[1] : null,
+      company: m ? m[2] : title,
+      cik: m ? m[3] : null,
+      accessionNumber: acc,
+      filedAt: grab(/<updated>([^<]+)<\/updated>/),
+      indexUrl: grab(/href="([^"]+-index\.htm)"/),
+      ...(items.length ? { items } : {}),
+    });
+  }
+  return filings;
+}
+
+export async function toolIpoPipeline(args, ctx) {
+  const limit = Math.min(Math.max(parseInt(args.limit, 10) || 20, 1), 40);
+  const includeAmendments = args.include_amendments === true || args.include_amendments === "true";
+
+  const [s1, f1] = await Promise.all([fetchCurrentFeed("S-1", ctx), fetchCurrentFeed("F-1", ctx)]);
+  // EDGAR's type filter is a prefix match: asking for F-1 also returns F-10
+  // (a different form entirely). Keep exactly the registration forms.
+  const wanted = includeAmendments ? new Set(["S-1", "F-1", "S-1/A", "F-1/A"]) : new Set(["S-1", "F-1"]);
+  const filings = [...s1, ...f1]
+    .filter((f) => wanted.has(String(f.form || "")))
+    .sort((a, b) => String(b.filedAt || "").localeCompare(String(a.filedAt || "")))
+    .slice(0, limit);
+
+  return {
+    returned: filings.length,
+    filings,
+    note:
+      "New S-1 and F-1 registration statements as they land at EDGAR, newest first: the earliest " +
+      "public signal of a US IPO. The type filter is a prefix match at EDGAR, so S-1/A amendments " +
+      "appear only when include_amendments is set.",
+  };
+}
+
+// ------------------------------------------------------ risk churn score
+
+export async function toolRiskChurnScore(args, ctx) {
+  const cmp = await toolCompareFilings(
+    { company: args.company, item: args.item || "1A", form: args.form || "10-K", max_passages: 5 },
+    ctx,
+  );
+  const sum = cmp.summary || {};
+  const pct = Math.round((sum.changeRatio || 0) * 1000) / 10;
+  // Bands sit on the published megacap distribution (research page below):
+  // calm boilerplate years run 15-20%, the latest megacap pairs run 15-52%,
+  // and the one event-class rewrite in ~30 measured pairs scored 89%.
+  const verdict = pct < 20 ? "boilerplate" : pct < 35 ? "typical" : pct < 55 ? "elevated" : "major rewrite";
+
+  return {
+    company: cmp.company,
+    cik: cmp.cik,
+    item: cmp.item,
+    itemTitle: cmp.itemTitle,
+    from: cmp.from,
+    to: cmp.to,
+    churnPercent: pct,
+    sentencesAdded: sum.added ?? null,
+    sentencesRemoved: sum.removed ?? null,
+    sentencesUnchanged: sum.unchanged ?? null,
+    verdict,
+    bands: { boilerplate: "<20%", typical: "20-35%", elevated: "35-55%", major_rewrite: ">55%" },
+    note:
+      "One decision number derived from the same sentence-level diff compare_filings sells; buy " +
+      "compare_filings when you need the changed passages themselves. Bands are heuristic, set on " +
+      "measured megacap 10-K Item 1A churn (signalnodus.ai/research/megacap-risk-factor-churn). A " +
+      "lightly reworded sentence counts as one removal plus one addition, so this measures editing " +
+      "activity, not exposure.",
+  };
+}
+
+// ------------------------------------------------- claim verification
+
+export async function toolVerifyFinancialClaim(args, ctx) {
+  const cik = await resolveCik(args.company, ctx);
+  const concept = str(args.concept);
+  if (!CONCEPTS.has(concept)) {
+    throw new RpcError(JSON_RPC.INVALID_PARAMS, `unsupported concept. Supported: ${[...CONCEPTS].join(", ")}`);
+  }
+  const claimed = Number(args.claimed_value);
+  if (!Number.isFinite(claimed)) {
+    throw new RpcError(JSON_RPC.INVALID_PARAMS, "claimed_value must be a number");
+  }
+  const tolerancePct = Math.min(Math.max(Number(args.tolerance_pct) || 0.5, 0), 10);
+  const fy = args.fiscal_year ? parseInt(args.fiscal_year, 10) : null;
+  const fp = args.fiscal_period ? String(args.fiscal_period).toUpperCase().trim() : null;
+  const endDate = /^\d{4}-\d{2}-\d{2}$/.test(String(args.end || "")) ? String(args.end) : null;
+  if (!fy && !endDate) {
+    throw new RpcError(JSON_RPC.INVALID_PARAMS, "pass fiscal_year (with optional fiscal_period) or an end date");
+  }
+  if (fp && !/^(FY|Q[1-4])$/.test(fp)) {
+    throw new RpcError(JSON_RPC.INVALID_PARAMS, "fiscal_period must be FY, Q1, Q2, Q3, or Q4");
+  }
+
+  const url = `https://data.sec.gov/api/xbrl/companyconcept/CIK${cik}/us-gaap/${concept}.json`;
+  const data = await secFetch(url, CONCEPT_TTL, ctx, { 404: `no ${concept} data reported for this company` });
+
+  const units = data?.units && typeof data.units === "object" ? data.units : {};
+  const unitNames = Object.keys(units).filter((u) => Array.isArray(units[u]));
+  const unit = unitNames.includes("USD") ? "USD" : unitNames[0];
+  const series = unit ? units[unit] : [];
+
+  let matches;
+  if (endDate) {
+    matches = series.filter((p) => p?.end === endDate);
+  } else {
+    // A filing reports comparatives under its own fy, so fy+fp alone can pick
+    // a prior-year figure. Among fy/fp matches, the current-period fact is
+    // the one with the latest period end.
+    matches = series.filter((p) => p?.fy === fy && p?.fp === (fp || "FY"));
+    const latestEnd = matches.reduce((m, p) => (String(p?.end || "") > m ? String(p.end) : m), "");
+    matches = matches.filter((p) => String(p?.end || "") === latestEnd);
+  }
+
+  const period = endDate ? { end: endDate } : { fiscalYear: fy, fiscalPeriod: fp || "FY" };
+
+  if (!matches.length) {
+    return {
+      verdict: "unverifiable",
+      company: clean(data?.entityName),
+      cik,
+      concept,
+      claimedValue: claimed,
+      period,
+      reason: "no as-reported fact for that period",
+      note:
+        "Checked against SEC XBRL as filed by the company. Unverifiable means no fact exists for " +
+        "the period, not that the claim is false.",
+    };
+  }
+
+  // The same fact can appear in several filings; the latest filed one is the
+  // company's most recent statement of it.
+  const fact = matches.reduce((best, p) => (String(p?.filed || "") > String(best?.filed || "") ? p : best), matches[0]);
+  const actual = typeof fact?.val === "number" ? fact.val : null;
+  const diffPercent = actual ? Math.abs((claimed - actual) / actual) * 100 : null;
+  const verdict = actual !== null && diffPercent <= tolerancePct ? "supported" : "contradicted";
+
+  return {
+    verdict,
+    company: clean(data?.entityName),
+    cik,
+    concept,
+    unit,
+    claimedValue: claimed,
+    actualValue: actual,
+    diffPercent: diffPercent === null ? null : Math.round(diffPercent * 100) / 100,
+    tolerancePct,
+    period: { ...period, start: fact?.start || null, end: fact?.end || null },
+    citation: { accessionNumber: fact?.accn || null, form: fact?.form || null, filed: fact?.filed || null },
+    note:
+      "Deterministic check against the company's own XBRL as filed with the SEC. A contradicted " +
+      "verdict means the claim disagrees with the as-reported figure beyond the tolerance; " +
+      "restatements live in later filings.",
   };
 }
 

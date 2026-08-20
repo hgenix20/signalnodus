@@ -659,6 +659,45 @@ curl https://api.signalnodus.ai/v1/signals <span class="dim"># 501: not built</s
   return pageShell("Signal Nodus", inner, { turnstile: true });
 }
 
+// One line per tool, derived from the same PRICING table the meter charges,
+// so this page cannot understate the catalog or drift from real prices.
+const TOOL_BLURBS = {
+  lookup_company: "proves the service works",
+  recent_filings: "recent filings with accession numbers",
+  company_financials: "as-reported XBRL facts",
+  filing_section: "one item extracted from a 10-K or 10-Q",
+  edgar_search: "phrase search over all filings since 2001",
+  filing_events: "8-K material events, decoded item codes",
+  who_holds: "which institutions hold a stock",
+  institutional_holdings: "a manager's 13F, parsed",
+  insider_trades: "Form 4s parsed into transactions",
+  activist_stakes: "13D/13G stakes naming a company",
+  ipo_pipeline: "new S-1/F-1 registrations",
+  latest_filings: "live market-wide filing feed",
+  government_contracts: "federal awards from USAspending",
+  lobbying: "Senate LDA disclosures by client",
+  evm_balance: "native balance, Base or Ethereum",
+  evm_gas: "current gas price",
+  evm_receipt: "transaction receipt",
+  token_price: "DEX-aggregated token price",
+  fx_rate: "ECB reference FX rates",
+  domain_report: "DNS, DMARC, registration age",
+  prediction_markets: "Polymarket implied odds",
+  risk_churn_score: "YoY filing churn as one verdict",
+  verify_financial_claim: "claim vs as-filed XBRL",
+  compare_filings: "the flagship: sentence-level YoY diff",
+};
+
+function priceBlock() {
+  return Object.keys(PRICING)
+    .map((tool) => {
+      const p = priceOf(tool);
+      const price = p === 0 ? "free " : dollars(p).padEnd(5, " ");
+      return `${tool.padEnd(22, " ")}${price}   ${TOOL_BLURBS[tool] || ""}`.trimEnd();
+    })
+    .join("\n");
+}
+
 function pricingPage() {
   const rows = packSummary()
     .map(
@@ -679,13 +718,7 @@ function pricingPage() {
 
       <section>
         <h2>Prices</h2>
-        <pre class="block">lookup_company        free    proves the service works
-recent_filings        $0.01
-company_financials    $0.01
-
-filing_section        $0.05   one item extracted from a 10-K or 10-Q
-latest_filings        $0.01   live market-wide filing feed, form-filterable
-compare_filings       $0.50   the same item diffed across two filings</pre>
+        <pre class="block">${priceBlock()}</pre>
         <p class="sub">
           <strong>No subscription and no minimum.</strong> <code>lookup_company</code>
           is free so you can prove the service works before wiring payment to it.
@@ -766,13 +799,21 @@ function llmsTxt() {
 - Pin an exact filing by accession number, so an amendment cannot move your
   baseline between runs.
 - Look up companies, list recent filings, and read as-reported XBRL figures.
+- Watch 8-K material events, 13D/13G stakes, insider trades, 13F holdings,
+  and new IPO registrations.
+- Verify a numeric claim against as-filed XBRL, or get year-over-year filing
+  churn as one scored verdict.
+- US government context: federal contract awards and lobbying disclosures.
+- Machine utilities: EVM reads, token prices, ECB FX, domain reports,
+  prediction-market odds.
 
-Source is US SEC EDGAR, the primary record. Not a scrape of somebody's summary.
+Sources are primary records (SEC EDGAR, USAspending.gov, Senate LDA, ECB,
+public chain RPC). Not a scrape of somebody's summary.
 
 ## Scope
 
-US SEC filings only. No share prices, no news, no non-US-listed companies, no
-forecasts, no analyst opinion.
+US-listed companies and US federal data. No news, no forecasts, no analyst
+opinion, no share-price history.
 
 ## Endpoints
 
@@ -790,16 +831,24 @@ service works before wiring payment; everything that does real work is priced.
 - recent_filings      ${price("recent_filings")}
 - company_financials  ${price("company_financials")}
 - filing_section      ${price("filing_section")}
+- edgar_search        ${price("edgar_search")}  exact-phrase search over all EDGAR filings since 2001
+- filing_events       ${price("filing_events")}  8-K material events, decoded item codes
 - who_holds           ${price("who_holds")}  which institutions hold a stock (inverse 13F)
 - institutional_holdings ${price("institutional_holdings")}  parsed 13F: top positions, % of portfolio
 - insider_trades      ${price("insider_trades")}  parsed Form 4s: who traded, role, shares, price
-- latest_filings      ${price("latest_filings")}
+- activist_stakes     ${price("activist_stakes")}  13D/13G filings naming a company
+- ipo_pipeline        ${price("ipo_pipeline")}  new S-1/F-1 registrations, market-wide
+- latest_filings      ${price("latest_filings")}  market-wide live filing feed, built for polling
+- government_contracts ${price("government_contracts")}  USAspending federal awards by company
+- lobbying            ${price("lobbying")}  Senate LDA disclosures by client
 - evm_balance / evm_gas / evm_receipt  ${price("evm_balance")} each  (Base + Ethereum, keyless RPC)
 - token_price         ${price("token_price")}  DEX-aggregated price, FDV, volume
 - fx_rate             ${price("fx_rate")}  ECB reference FX rates
-- domain_report       ${price("domain_report")}  DNS + registration age + registrar, one call
-- prediction_markets  ${price("prediction_markets")}  Polymarket implied probabilities  market-wide live filing feed, built for polling
-- compare_filings     ${price("compare_filings")}
+- domain_report       ${price("domain_report")}  DNS + DMARC + registration age, one call
+- prediction_markets  ${price("prediction_markets")}  Polymarket implied probabilities
+- risk_churn_score    ${price("risk_churn_score")}  YoY rewrite of a filing item as one scored verdict
+- verify_financial_claim ${price("verify_financial_claim")}  claim vs as-filed XBRL: supported/contradicted
+- compare_filings     ${price("compare_filings")}  the flagship: sentence-level YoY diff
 
 ## How to pay
 
@@ -1010,6 +1059,52 @@ function openApiDoc() {
       "/v1/markets/prediction": path("prediction_markets", "Top-volume Polymarket markets with implied probabilities, optionally filtered.", [
         q("q", "Substring filter over market questions."),
         q("limit", "Markets to return, max 25."),
+      ]),
+      "/v1/search": path("edgar_search", "Exact-phrase full-text search over all EDGAR filings since 2001.", [
+        q("q", "Exact phrase, 2-200 characters.", true),
+        q("forms", "Comma list of form types, e.g. 10-K,8-K."),
+        q("from", "Start date, YYYY-MM-DD."),
+        q("to", "End date, YYYY-MM-DD."),
+        q("limit", "Hits to return, max 50."),
+      ]),
+      "/v1/events": path("filing_events", "A company's 8-K material events with decoded item codes.", [
+        q("company", "Ticker or company name.", true),
+        q("item", "Item-code filter, e.g. 5.02."),
+        q("limit", "Events to return, max 25."),
+        q("include_amendments", "Also include 8-K/A amendments."),
+      ]),
+      "/v1/activists": path("activist_stakes", "Schedule 13D/13G filings naming a company: activist and passive stakes.", [
+        q("company", "Ticker or company name.", true),
+        q("days", "Lookback window in days, 30-730."),
+        q("limit", "Filings to return, max 100."),
+      ]),
+      "/v1/ipos": path("ipo_pipeline", "New S-1/F-1 registrations market-wide: the earliest IPO signal.", [
+        q("limit", "Filings to return, max 40."),
+        q("include_amendments", "Also include S-1/A and F-1/A."),
+      ]),
+      "/v1/gov/contracts": path("government_contracts", "US federal prime contract awards to a company, from USAspending.gov.", [
+        q("company", "Recipient name, e.g. Lockheed Martin.", true),
+        q("days", "Lookback window in days, 30-1825."),
+        q("limit", "Awards to return, max 25."),
+      ]),
+      "/v1/gov/lobbying": path("lobbying", "US Senate LDA lobbying disclosures for a client company.", [
+        q("company", "Client company name.", true),
+        q("year", "Filing year filter."),
+        q("limit", "Filings to return, max 25."),
+      ]),
+      "/v1/score/churn": path("risk_churn_score", "Year-over-year churn of a filing item as one scored verdict.", [
+        q("company", "Ticker or company name.", true),
+        q("item", "Item identifier. Default 1A."),
+        q("form", "10-K or 10-Q. Default 10-K."),
+      ]),
+      "/v1/verify/claim": path("verify_financial_claim", "Deterministic check of a numeric claim against as-filed XBRL.", [
+        q("company", "Ticker or company name.", true),
+        q("concept", "XBRL concept, e.g. Revenues.", true),
+        q("claimed_value", "The asserted value.", true),
+        q("fiscal_year", "Fiscal year of the claim."),
+        q("fiscal_period", "FY, Q1-Q4. Default FY."),
+        q("end", "Exact period end date, alternative to fiscal_year."),
+        q("tolerance_pct", "Match tolerance percent. Default 0.5."),
       ]),
       "/v1/credit": {
         get: {

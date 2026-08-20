@@ -49,6 +49,14 @@ export const PRICING = {
   token_price: 10, // $0.01
   latest_filings: 10, // $0.01 — the polling product; volume, not margin
   compare_filings: 500, // $0.50 — clears the card minimum, so both rails work
+  edgar_search: 10, // $0.01 - EDGAR full-text search, the enrichment on-ramp
+  filing_events: 50, // $0.05 - 8-K events with decoded item codes
+  activist_stakes: 50, // $0.05 - 13D/13G filings naming a company
+  ipo_pipeline: 10, // $0.01 - new S-1/F-1 registrations, market-wide
+  government_contracts: 50, // $0.05 - USAspending federal awards
+  lobbying: 50, // $0.05 - Senate LDA disclosures
+  risk_churn_score: 100, // $0.10 - decision oracle over the diff
+  verify_financial_claim: 100, // $0.10 - deterministic XBRL claim check
 };
 
 export function priceOf(tool) {
@@ -143,6 +151,14 @@ const PAYABLE_ROUTE = {
   evm_receipt: "/v1/evm/receipt",
   token_price: "/v1/token/price",
   latest_filings: "/v1/latest",
+  edgar_search: "/v1/search",
+  filing_events: "/v1/events",
+  activist_stakes: "/v1/activists",
+  ipo_pipeline: "/v1/ipos",
+  government_contracts: "/v1/gov/contracts",
+  lobbying: "/v1/gov/lobbying",
+  risk_churn_score: "/v1/score/churn",
+  verify_financial_claim: "/v1/verify/claim",
 };
 
 // What a caller gets when they are out of credit. Shaped so an agent can act on
