@@ -83,9 +83,15 @@ docs, Stripe Directory, llms.txt//.well-known/mpp.json.
       live); x402-observer and other x402 indexes already crawl us
 - [ ] the402 / Agent402: canonical domains not confirmed (the402.xyz and
       the402.org are unrelated sites); revisit with better sourcing
-- QUEUED FOR KAMERON (need wallets/accounts, I cannot create them):
-  Virtuals ACP, Olas Mech, Toku, NEAR Agent Market, Circle Agent
-  Marketplace, Auto.exchange, AgentPact, AgentHire, Daydreams TaskMarket
+- [x] Toku LIVE 2026-08-20: agent signal-nodus registered self-serve (no
+      wallet needed), 3 services published, autonomous webhook fulfillment
+      at /integrations/toku (src/toku.js). Payout needs Kameron's Stripe
+      Connect onboarding once revenue accrues.
+- QUEUED FOR KAMERON (need wallets/accounts, runsheet at
+  C:i-company\signalnodus-marketplace-runsheet.md): Virtuals ACP,
+  Olas Mech, NEAR (parked, "coming soon"), Circle. auto.exchange is a
+  poor fit (hosts persona agents, does not list external APIs); AgentPact/
+  AgentHire/Daydreams domains unconfirmed, do not chase
 
 ## Customer journeys (final acceptance)
 

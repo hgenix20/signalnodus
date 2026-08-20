@@ -2,6 +2,7 @@ import { handleMcp } from "./mcp.js";
 import { createCheckout, handleWebhook, keyBalance, packSummary, pruneAbandonedCheckouts } from "./payments.js";
 import { PRICING, priceOf, dollars } from "./billing.js";
 import { handleMppRoute, isMppRoute, describeRoutes } from "./mpp.js";
+import { handleTokuWebhook } from "./toku.js";
 import { handleDashboard, isDashboardPath } from "./dashboard.js";
 
 // Signal Nodus — one Worker serving all signalnodus.ai hosts.
@@ -65,6 +66,9 @@ export default {
 
     switch (host) {
       case "api.signalnodus.ai": {
+        if (url.pathname === "/integrations/toku" && request.method === "POST") {
+          return handleTokuWebhook(request, env, ctx);
+        }
         if (isMppRoute(url.pathname)) {
           const paid = await handleMppRoute(request, env, ctx, url);
           if (paid) return paid;
