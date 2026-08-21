@@ -1,6 +1,6 @@
-import { handleMcp } from "./mcp.js";
-import { createCheckout, handleWebhook, keyBalance, packSummary, pruneAbandonedCheckouts } from "./payments.js";
-import { PRICING, priceOf, dollars } from "./billing.js";
+import { handleMcp, toolLatestFilings } from "./mcp.js";
+import { createCheckout, handleWebhook, keyBalance, packSummary, pruneAbandonedCheckouts, mintKey } from "./payments.js";
+import { PRICING, priceOf, dollars, hashKey } from "./billing.js";
 import { handleMppRoute, isMppRoute, describeRoutes } from "./mpp.js";
 import { handleTokuWebhook } from "./toku.js";
 import { handleDashboard, isDashboardPath } from "./dashboard.js";
@@ -124,6 +124,11 @@ async function apexResponse(request, url, env, ctx) {
     return verifyContact(request, env);
   }
 
+  if (url.pathname === "/api/trial") {
+    if (request.method !== "POST") return json({ error: "method not allowed" }, 405, { allow: "POST" });
+    return handleTrial(request, env, ctx);
+  }
+
   if (url.pathname === "/api/checkout" && request.method === "POST") {
     return createCheckout(request, env);
   }
@@ -168,6 +173,21 @@ async function apexResponse(request, url, env, ctx) {
       200,
       NOINDEX,
     );
+  }
+  if (url.pathname === "/trial") { logPageView(env, ctx, request, url); return html(trialPage()); }
+  if (url.pathname === "/recipes") { logPageView(env, ctx, request, url); return html(recipesPage()); }
+  if (url.pathname === "/radar") {
+    logPageView(env, ctx, request, url);
+    // The scan hits SEC EDGAR, so cache the built page at the edge for 15
+    // minutes rather than recomputing (and re-fetching from SEC) per visitor.
+    const cache = caches.default;
+    const ck = new Request("https://signalnodus.ai/radar");
+    let resp = await cache.match(ck);
+    if (!resp) {
+      resp = html(await radarPage(env, ctx), 200, { "cache-control": "public, max-age=900" });
+      ctx.waitUntil(cache.put(ck, resp.clone()));
+    }
+    return resp;
   }
   if (url.pathname === "/pricing") { logPageView(env, ctx, request, url); return html(pricingPage()); }
   if (url.pathname === "/research") { logPageView(env, ctx, request, url); return html(researchIndex()); }
@@ -286,6 +306,92 @@ async function verifyContact(request, env) {
   }
 
   return json({ success: true, email: env.CONTACT_EMAIL || CONTACT_EMAIL_FALLBACK });
+}
+
+// Issues a small free-credit key so a developer can try the product from their
+// own agent with no card and no signup. Turnstile gates it against scripted
+// farming, and one key is issued per connection (the label carries a hash of
+// the IP). The credit is tiny and our own compute is near-free, so the worst
+// case of abuse costs cents.
+const TRIAL_UNITS = 5000; // $5.00 of API credit
+
+async function handleTrial(request, env, ctx) {
+  if (!env.TURNSTILE_SECRET || !env.BILLING) {
+    return json({ error: "trial unavailable" }, 503);
+  }
+
+  let token;
+  try {
+    const raw = await request.text();
+    if (raw.length > MAX_VERIFY_BODY) return json({ error: "body too large" }, 413);
+    ({ token } = JSON.parse(raw || "{}"));
+  } catch {
+    return json({ error: "bad request" }, 400);
+  }
+  if (!token || typeof token !== "string" || token.length > 4096) {
+    return json({ error: "missing token" }, 400);
+  }
+
+  // The visitor must clear Turnstile: this is what stops a script from minting
+  // free keys in a loop.
+  const ip = request.headers.get("cf-connecting-ip") ?? "";
+  const form = new FormData();
+  form.append("secret", env.TURNSTILE_SECRET);
+  form.append("response", token);
+  form.append("remoteip", ip);
+  let outcome;
+  try {
+    const res = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
+      method: "POST",
+      body: form,
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!res.ok) throw new Error(`siteverify HTTP ${res.status}`);
+    outcome = await res.json();
+  } catch (err) {
+    console.error("trial siteverify failed", err);
+    return json({ error: "verification unavailable" }, 503);
+  }
+  if (!outcome?.success || (outcome.hostname && !isOwnHostname(outcome.hostname))) {
+    return json({ error: "verification failed" }, 403);
+  }
+
+  // One trial per connection. The label carries a hash of the IP so a repeat
+  // request is refused rather than farmed.
+  const ipHash = (await hashKey(ip || "unknown")).slice(0, 32);
+  const label = `trial:${ipHash}`;
+  try {
+    const existing = await env.BILLING.prepare("SELECT 1 FROM api_keys WHERE label = ? LIMIT 1")
+      .bind(label)
+      .first();
+    if (existing) {
+      return json(
+        {
+          error: "trial_already_issued",
+          detail: "A free test key was already issued for this connection. Buy credit at https://signalnodus.ai/pricing.",
+        },
+        409,
+      );
+    }
+  } catch (err) {
+    console.error("trial dedupe check failed", err);
+    // A duplicate trial costs cents; continue rather than deny a real user.
+  }
+
+  let key;
+  try {
+    key = await mintKey(env, TRIAL_UNITS, label);
+  } catch (err) {
+    console.error("trial mint failed", err);
+    return json({ error: "could not issue trial" }, 503);
+  }
+
+  return json({
+    api_key: key,
+    credit: dollars(TRIAL_UNITS),
+    usage: "Send as Authorization: Bearer <key> to mcp.signalnodus.ai or api.signalnodus.ai. Balance at https://signalnodus.ai/api/balance.",
+    note: "Free test credit, no expiry. Save this key now; it is not stored in plaintext and cannot be shown again.",
+  });
 }
 
 function isOwnHostname(hostname) {
@@ -480,6 +586,12 @@ ul.research li{margin:0 0 1rem 0}
   table.packs { border-collapse: collapse; margin-top: 8px; }
   table.packs th, table.packs td { text-align: left; padding: 8px 22px 8px 0; border-bottom: 1px solid var(--line); }
   table.packs th { color: var(--dim); font-weight: 600; font-size: 14px; }
+  .radar { margin-top: 8px; }
+  .radar-item { padding: 14px 0; border-top: 1px solid var(--line); }
+  .radar-item:first-child { border-top: none; }
+  .radar-co { font-weight: 600; color: var(--text); }
+  .radar-meta { font-size: 13.5px; margin-top: 4px; }
+  .mono { font-family: ui-monospace, Consolas, monospace; font-size: .9em; }
 `;
 
 function siteScript(env) {
@@ -514,6 +626,37 @@ function siteScript(env) {
 
   const el = () => document.getElementById("contact-result");
 
+  window.onTrialToken = async (token) => {
+    const out = document.getElementById("trial-result");
+    if (out) out.textContent = "Issuing your key...";
+    try {
+      const r = await fetch("/api/trial", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ token }),
+      });
+      const d = await r.json();
+      if (r.ok && d.api_key) {
+        out.textContent = "";
+        const p1 = document.createElement("p");
+        p1.textContent = "Your test key (" + (d.credit || "$5.00") + " credit). Save it now; it is not shown again:";
+        const pre = document.createElement("pre");
+        pre.className = "block";
+        pre.textContent = d.api_key;
+        const p2 = document.createElement("p");
+        p2.className = "sub";
+        p2.textContent = "Use it as Authorization: Bearer <key> against mcp.signalnodus.ai or api.signalnodus.ai.";
+        out.appendChild(p1);
+        out.appendChild(pre);
+        out.appendChild(p2);
+      } else {
+        out.textContent = (d && (d.detail || d.error)) || "Could not issue a key. Buy credit at /pricing.";
+      }
+    } catch (e) {
+      out.textContent = "Something broke. Refresh and try again, or buy credit at /pricing.";
+    }
+  };
+
   window.onTurnstileOK = async (token) => {
     const out = el();
     try {
@@ -545,11 +688,12 @@ function siteScript(env) {
   const iv = setInterval(() => {
     if (window.turnstile) {
       clearInterval(iv);
-      window.turnstile.render("#cf-widget", {
-        sitekey: ${sitekey},
-        theme: "dark",
-        callback: window.onTurnstileOK,
-      });
+      if (document.getElementById("cf-widget")) {
+        window.turnstile.render("#cf-widget", { sitekey: ${sitekey}, theme: "dark", callback: window.onTurnstileOK });
+      }
+      if (document.getElementById("cf-trial")) {
+        window.turnstile.render("#cf-trial", { sitekey: ${sitekey}, theme: "dark", callback: window.onTrialToken });
+      }
       return;
     }
     if (++tries > 100) {
@@ -575,6 +719,12 @@ function pageShell(title, inner, opts = {}) {
 ${canonical ? `<link rel="canonical" href="${canonical}">` : ""}
 ${index ? "" : '<meta name="robots" content="noindex, nofollow">'}
 <meta name="description" content="${description || "Signal Nodus: year-over-year diffs of SEC filing sections, pinned to accession numbers. The diff is the product; raw data is the on-ramp."}">
+<meta property="og:title" content="${title}">
+<meta property="og:description" content="${description || "SEC filing intelligence for AI agents. 27 tools over MCP and HTTP, priced per call, paid with a key or x402 on Base."}">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Signal Nodus">
+${canonical ? `<meta property="og:url" content="${canonical}">` : ""}
+<meta name="twitter:card" content="summary">
 <link rel="stylesheet" href="/site.css">
 ${beacon}
 </head>
@@ -602,50 +752,72 @@ function landingPage() {
       email, ships its own fixes, and publishes its work in the open. A human
       owns the till and the kill switch. <a href="https://github.com/hgenix20/signalnodus">Source</a>.
     </p>
+    <p class="sub">
+      Watch it work: the most material SEC 8-K events on file right now, decoded
+      and ranked by the agent, at <a href="/radar"><strong>signalnodus.ai/radar</strong></a>.
+    </p>
+    <p class="sub">
+      Try it from your own agent with a <a href="/trial"><strong>free $5 test key</strong></a>.
+      No card, no signup.
+    </p>
   </section>
 
   <section id="prices">
     <h2>Pricing</h2>
-    <p class="sub">Per call, no subscription, no floor. Company lookup is free.</p>
-    <pre class="block">lookup_company    free      recent_filings   $0.01
-filing_section    $0.05     insider_trades   $0.05
-13F holdings      $0.05     compare_filings  $0.50 (the diff)
-EVM + market data $0.01 each</pre>
+    <p class="sub">Per call, no subscription, no monthly minimum. The incumbents charge $49 to $239 a month before your agent reads a single filing; here it is $0.01 when it actually needs one. Company lookup is free.</p>
+    <pre class="block">lookup_company     free       company_financials  $0.01
+recent_filings     $0.01      latest_filings      $0.01
+filing_section     $0.05      insider_trades      $0.05
+13F holdings       $0.05      compare_filings     $0.50 (the diff)
+gov + market data  $0.01-$0.10 each</pre>
     <p class="sub"><a href="/pricing"><strong>Buy credit</strong></a> with a card in two minutes,
     or pay per call over x402 on Base with no account at all.</p>
   </section>
 
   <section id="mcp">
-    <h2>Working today: the MCP server</h2>
+    <h2>27 tools, live over MCP and HTTP</h2>
     <pre class="block">https://mcp.signalnodus.ai/   <span class="dim"># streamable-http; lookup is free, no signup</span></pre>
     <p class="sub">
-      Five tools over US SEC EDGAR: <code>lookup_company</code> (free),
-      <code>recent_filings</code>, <code>company_financials</code>,
-      <code>filing_section</code>, and <code>compare_filings</code>. Clean section
-      text and sentence-level year-over-year diffs, every result pinned to the
-      accession number it came from, so an amendment can never move a
+      Point an MCP client at the server and the tools appear. The same tools
+      answer over plain HTTP at <a href="https://api.signalnodus.ai/">api.signalnodus.ai</a>.
+      <code>lookup_company</code> is free; every other call is priced from $0.01,
+      paid with a prepaid key or per call over x402 on Base. No signup.
+    </p>
+    <p class="sub">
+      <strong>SEC filings:</strong> year-over-year section diffs (the flagship),
+      8-K material events, 13D/13G activist stakes, insider Form 4s, 13F
+      holdings, the IPO pipeline, full-text search since 2001, as-reported XBRL,
+      and a deterministic check of any numeric claim against it. Every result is
+      pinned to the accession it came from, so an amendment can't move a
       baseline you already computed.
     </p>
     <p class="sub">
-      Scope, stated plainly: SEC filings only. <strong>No</strong> prices, news,
-      non-US-listed companies, or forecasts. Every data call is priced, from
-      $0.01, payable per call over x402 on Base or with a prepaid key.
-      <a href="/pricing">Pricing</a>.
+      <strong>US government:</strong> federal contract awards and Senate
+      lobbying disclosures.
     </p>
     <p class="sub">
-      What the tools find when pointed at real filings:
-      <a href="/research">research</a>, every number reproducible against the
-      SEC's own documents.
+      <strong>Machine utilities:</strong> EVM reads, token prices and
+      due-diligence reports, ECB FX, domain reports, cheapest-chain gas, an x402
+      endpoint audit, and prediction-market odds.
+    </p>
+    <p class="sub">
+      Scope, stated plainly: primary records only. No news, no forecasts, no
+      analyst opinion. See what the tools find on real filings:
+      <a href="/research">research</a>, or copy-paste <a href="/recipes">recipes</a>
+      to call them from your agent. Every number reproducible against the source
+      documents.
     </p>
   </section>
 
   <section class="mt">
-    <h2>The REST API is not built</h2>
-    <pre class="block">curl https://api.signalnodus.ai/           <span class="dim"># service descriptor</span>
-curl https://api.signalnodus.ai/v1/signals <span class="dim"># 501: not built</span></pre>
+    <h2>The REST API is live</h2>
+    <pre class="block">curl "https://api.signalnodus.ai/v1/company?company=NVDA"          <span class="dim"># free</span>
+curl "https://api.signalnodus.ai/v1/compare?company=NVDA&amp;item=1A"  <span class="dim"># $0.50, the diff</span></pre>
     <p class="sub">
-      Every <code>/v1/*</code> route returns 501 and will keep doing so until
-      someone tells us what belongs there. That is the honest state of it.
+      An unpaid call to a priced route returns HTTP 402 with an x402 challenge
+      on Base. Settle it and the same call returns the data, no account. Or send
+      <code>Authorization: Bearer &lt;key&gt;</code> from a prepaid balance. Both
+      paths are verified end to end.
     </p>
   </section>
 
@@ -661,6 +833,98 @@ curl https://api.signalnodus.ai/v1/signals <span class="dim"># 501: not built</s
   </section>
 </main>`;
   return pageShell("Signal Nodus", inner, { turnstile: true });
+}
+
+// 8-K item codes ranked by how much a reader should care, each with the
+// plain-English stakes. Higher score = more material. This is the same ranking
+// the demo agent uses; the radar page is the product dogfooded on live filings.
+const EIGHTK_SIGNAL = {
+  "1.03": [100, "filed for bankruptcy or receivership"],
+  "4.02": [98, "said previously issued financials can no longer be relied on (a restatement flag)"],
+  "3.01": [92, "received a delisting or listing-standard notice"],
+  "2.04": [88, "triggered acceleration of a direct financial obligation"],
+  "4.01": [80, "changed its independent auditor"],
+  "5.02": [70, "reported a change in directors or top officers"],
+  "1.02": [66, "terminated a material definitive agreement"],
+  "2.06": [64, "recorded a material impairment"],
+  "2.05": [62, "committed to a restructuring or exit plan"],
+  "1.01": [55, "entered a material definitive agreement"],
+  "2.02": [50, "reported results of operations"],
+  "5.07": [34, "disclosed shareholder-vote results"],
+  "7.01": [30, "disclosed information under Regulation FD"],
+  "8.01": [20, "filed an other-events disclosure"],
+};
+
+function escHtml(s) {
+  return String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+}
+
+// A live, public demo of the product: the most material 8-K events on file
+// right now, decoded and ranked by calling our own tools internally (the Worker
+// cannot fetch its own custom domain, so it calls the tool functions directly).
+async function radarPage(env, ctx) {
+  let rows = "";
+  try {
+    const data = await toolLatestFilings({ form: "8-K", limit: 40 }, ctx);
+    const ranked = (data.filings || [])
+      .map((f) => {
+        let best = null;
+        for (const it of f.items || []) {
+          const s = EIGHTK_SIGNAL[it.item];
+          if (s && (!best || s[0] > best.score)) best = { score: s[0], item: it.item, stakes: s[1], title: it.title };
+        }
+        return best ? { f, sig: best } : null;
+      })
+      .filter(Boolean)
+      .sort((a, b) => b.sig.score - a.sig.score)
+      .slice(0, 12);
+
+    rows = ranked
+      .map(({ f, sig }) => {
+        const co = escHtml((f.company || "A public company").replace(/\s+/g, " ").trim());
+        const date = escHtml(String(f.filingDate || f.filedAt || "").slice(0, 10));
+        const acc = escHtml(f.accessionNumber || "");
+        return `<div class="radar-item">
+  <div><span class="radar-co">${co}</span> ${escHtml(sig.stakes)}.</div>
+  <div class="dim radar-meta">Item ${escHtml(sig.item)}: ${escHtml(sig.title)} &middot; 8-K filed ${date} &middot; <span class="mono">${acc}</span></div>
+</div>`;
+      })
+      .join("\n");
+
+    if (!rows) rows = `<p class="sub">No high-signal 8-K events in the latest batch. This page refreshes every 15 minutes.</p>`;
+  } catch (err) {
+    console.error("radar build failed", err);
+    rows = `<p class="sub">The radar could not reach SEC EDGAR just now. It refreshes every 15 minutes; try again shortly.</p>`;
+  }
+
+  const inner = `
+<main class="wrap">
+  <section class="hero">
+    <h1>SEC material-event radar</h1>
+    <p class="lede">The most consequential 8-K events on file with the SEC right now, decoded and ranked by an autonomous agent. Primary-source, refreshed every 15 minutes.</p>
+    <p class="sub">Every row was pulled and decoded with the same Signal Nodus tools an agent can call. This page is the product, dogfooded on live filings.</p>
+  </section>
+  <section>
+    <div class="radar">
+${rows}
+    </div>
+    <p class="dim mt">Item-code meanings are the SEC's own. Ranking reflects how material an event type usually is, not a view on any company. Not investment advice.</p>
+  </section>
+  <section class="mt">
+    <h2>Run this from your own agent</h2>
+    <pre class="block">// MCP: point your client at the server, then call the tools
+https://mcp.signalnodus.ai/     <span class="dim"># lookup_company is free</span>
+
+// or over HTTP, pay per call with a prepaid key or x402 on Base
+curl "https://api.signalnodus.ai/v1/latest?form=8-K&amp;limit=40" \\
+  -H "authorization: Bearer &lt;key&gt;"</pre>
+    <p class="sub">The feed above uses <code>latest_filings</code> and the decoded item codes it carries. Full catalog and prices on the <a href="/pricing">pricing page</a>.</p>
+  </section>
+</main>`;
+  return pageShell("SEC material-event radar · Signal Nodus", inner, {
+    canonical: "https://signalnodus.ai/radar",
+    description: "A live radar of the most material SEC 8-K events, decoded and ranked by an autonomous agent. Built on Signal Nodus.",
+  });
 }
 
 // One line per tool, derived from the same PRICING table the meter charges,
@@ -703,6 +967,95 @@ function priceBlock() {
       return `${tool.padEnd(22, " ")}${price}   ${TOOL_BLURBS[tool] || ""}`.trimEnd();
     })
     .join("\n");
+}
+
+function recipesPage() {
+  const inner = `
+<main class="wrap">
+  <section class="hero">
+    <h1>Recipes</h1>
+    <p class="lede">
+      Copy-paste calls your agent can make today. Each one is a real endpoint,
+      priced per call, paid with a key or x402 on Base. Grab a
+      <a href="/trial">free $5 key</a> first.
+    </p>
+  </section>
+  <section>
+    <h2>Diff a 10-K's risk factors, year over year</h2>
+    <p class="sub">The flagship. A sentence-level diff of Item 1A across a
+      company's two most recent 10-Ks, pinned to accession numbers so an
+      amendment can't move a baseline you already computed.</p>
+    <pre class="block">curl "https://api.signalnodus.ai/v1/compare?company=NVDA&amp;item=1A" \\
+  -H "authorization: Bearer &lt;key&gt;"</pre>
+  </section>
+  <section class="mt">
+    <h2>Watch a ticker for material 8-K events</h2>
+    <p class="sub">Decoded item codes, so your agent tells a 4.02 restatement
+      flag from a routine 8.01.</p>
+    <pre class="block">curl "https://api.signalnodus.ai/v1/events?company=TSLA&amp;limit=10" \\
+  -H "authorization: Bearer &lt;key&gt;"</pre>
+  </section>
+  <section class="mt">
+    <h2>Verify a number against the actual filing</h2>
+    <p class="sub">A deterministic check of a claimed value against as-reported
+      XBRL. Returns supported or contradicted, with the citation.</p>
+    <pre class="block">curl "https://api.signalnodus.ai/v1/verify/claim?company=AAPL&amp;concept=Revenues&amp;claimed_value=391035000000&amp;fiscal_year=2024" \\
+  -H "authorization: Bearer &lt;key&gt;"</pre>
+  </section>
+  <section class="mt">
+    <h2>See who just filed to go public</h2>
+    <p class="sub">New S-1 and F-1 registrations market-wide, the earliest IPO
+      signal.</p>
+    <pre class="block">curl "https://api.signalnodus.ai/v1/ipos?limit=10" \\
+  -H "authorization: Bearer &lt;key&gt;"</pre>
+  </section>
+  <section class="mt">
+    <h2>Track insider selling</h2>
+    <p class="sub">Form 4 transactions parsed into who traded, their role,
+      shares, and price.</p>
+    <pre class="block">curl "https://api.signalnodus.ai/v1/insider?company=NVDA&amp;limit=5" \\
+  -H "authorization: Bearer &lt;key&gt;"</pre>
+  </section>
+  <section class="mt">
+    <h2>Over MCP</h2>
+    <p class="sub">Point any MCP client at the server and these become tool
+      calls, no keys in the URL.</p>
+    <pre class="block">https://mcp.signalnodus.ai/   <span class="dim"># streamable-http; Authorization: Bearer &lt;key&gt;</span></pre>
+    <p class="sub">Full catalog and prices on the <a href="/pricing">pricing page</a>.</p>
+  </section>
+</main>`;
+  return pageShell("Recipes · Signal Nodus", inner, {
+    canonical: "https://signalnodus.ai/recipes",
+    description: "Copy-paste SEC-filing API calls for AI agents: diff a 10-K's risk factors, watch 8-K events, verify a number, track insiders, spot IPOs.",
+  });
+}
+
+function trialPage() {
+  const inner = `
+<main class="wrap">
+  <section class="hero">
+    <h1>Free test key</h1>
+    <p class="lede">
+      Get $5 of API credit to try Signal Nodus from your own agent. No card, no
+      signup. Clear the checkpoint and the key appears.
+    </p>
+    <p class="sub">
+      Point an MCP client at <code>mcp.signalnodus.ai</code>, or call
+      <code>api.signalnodus.ai</code> over HTTP, with
+      <code>Authorization: Bearer &lt;key&gt;</code>. <code>lookup_company</code>
+      is free; everything else spends from the $5. See the
+      <a href="/radar">radar demo</a> for what the tools return, or the
+      <a href="/pricing">full pricing</a>.
+    </p>
+    <div id="cf-trial" class="mt"></div>
+    <p id="trial-result" class="mt"></p>
+  </section>
+</main>`;
+  return pageShell("Free test key · Signal Nodus", inner, {
+    canonical: "https://signalnodus.ai/trial",
+    turnstile: true,
+    description: "Get $5 of free Signal Nodus API credit to try SEC filing intelligence from your agent. No card, no signup.",
+  });
 }
 
 function pricingPage() {
