@@ -52,6 +52,12 @@ function safeUrl(raw) {
   if (blocked) throw new X402Error("internal hostnames are not audited");
   // Only standard HTTPS port.
   if (u.port && u.port !== "443") throw new X402Error("only port 443 is audited");
+  // This service runs on signalnodus.ai; a Worker cannot fetch its own custom
+  // domain (the loopback is refused and comes back as a 52x), so auditing our
+  // own hosts would only ever report a false failure. Point it elsewhere.
+  if (host === "signalnodus.ai" || host.endsWith(".signalnodus.ai")) {
+    throw new X402Error("cannot audit signalnodus.ai's own endpoints (self-loopback); point the url at an external x402 endpoint");
+  }
   return u;
 }
 
@@ -106,6 +112,20 @@ export async function toolX402Audit(args) {
   const wwwAuth = res.headers.get("www-authenticate");
   const paymentReq = res.headers.get("payment-required");
   const contentType = res.headers.get("content-type") || null;
+
+  // Cloudflare origin errors (520-527) mean the endpoint could not be reached
+  // behind its edge, not that it lacks a challenge. Report that plainly so the
+  // caller does not read a connection failure as "not an x402 endpoint".
+  if (status >= 520 && status <= 527) {
+    return {
+      url: url.toString(),
+      httpStatus: status,
+      verdict: "unreachable",
+      score: "0/8",
+      rails: [],
+      note: `the endpoint was unreachable (HTTP ${status}, a Cloudflare origin error); this is a connection failure, not a verdict on its x402 support. Try again later or check the URL.`,
+    };
+  }
 
   const is402 = status === 402;
   add("responds_402_without_payment", is402,

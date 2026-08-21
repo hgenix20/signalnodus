@@ -311,7 +311,7 @@ const BAZAAR_INFO = {
     out: { verdict: "supported", actualValue: 391035000000, diffPercent: 0, citation: { accessionNumber: "0000320193-24-000123", form: "10-K" } },
   },
   "/v1/x402/audit": {
-    q: { url: "https://api.signalnodus.ai/v1/company" },
+    q: { url: "https://api.otheragent.example/v1/resource" },
     out: { verdict: "healthy", score: "7/8", rails: [{ scheme: "exact", network: "eip155:8453", networkLabel: "Base mainnet", asset: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913", payTo: "0xCF7682647d17803F997308A10c191557d899Ec30" }], hasBazaar: true },
   },
   "/v1/token/report": {
