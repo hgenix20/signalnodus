@@ -8,6 +8,8 @@
 
 import { htmlToText, extractItem, diffSections, itemCatalog, knownItem } from "./filings.js";
 import { toolGovernmentContracts, toolLobbying, GovError } from "./govdata.js";
+import { toolGasOptimizer, toolTokenReport } from "./onchain.js";
+import { toolX402Audit, X402Error } from "./x402audit.js";
 import { toolEvmBalance, toolEvmGas, toolEvmReceipt, toolTokenPrice } from "./onchain.js";
 import { toolFxRate, toolDomainReport, toolPredictionMarkets } from "./market.js";
 import { authorize, paymentRequired, priceOf, dollars } from "./billing.js";
@@ -824,6 +826,52 @@ const TOOLS = [
     },
     annotations: { readOnlyHint: true, openWorldHint: true },
   },
+  {
+    name: "x402_audit",
+    title: "Audit an x402 endpoint",
+    description:
+      "Inspect one public HTTPS x402 endpoint and report the 402 challenge it returns to an anonymous caller: HTTP status, " +
+      "payment rails (scheme, network, asset, recipient), WWW-Authenticate header, Bazaar discovery extension, and a pass/fail " +
+      "checklist with a health verdict. No payment is signed or submitted. Costs $0.10 per call.",
+    inputSchema: {
+      type: "object",
+      properties: { url: { type: "string", description: "Absolute https URL of the x402 resource, e.g. https://api.example.com/v1/thing" } },
+      required: ["url"],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: true, openWorldHint: true },
+  },
+  {
+    name: "token_report",
+    title: "Token due-diligence report",
+    description:
+      "One-call market data for an ERC-20 token: price, 24h change, FDV, market cap, 24h volume, supply, pool count, deepest " +
+      "pool liquidity, and factual risk flags (low liquidity, thin volume). GeckoTerminal aggregated DEX data. Not an oracle, " +
+      "not financial advice. Costs $0.10 per call.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        chain: { type: "string", description: "base, ethereum, or arbitrum. Default base." },
+        token: { type: "string", description: "Token contract address (0x...)." },
+      },
+      required: ["token"],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: true, openWorldHint: true },
+  },
+  {
+    name: "gas_optimizer",
+    title: "Cheapest-chain gas",
+    description:
+      "Live network fee across Base, Arbitrum, and Ethereum, expressed as the USD cost of a standard native transfer so chains " +
+      "compare on money, with the cheapest chain named. Network fee only, not a route or swap quote. Costs $0.05 per call.",
+    inputSchema: {
+      type: "object",
+      properties: { chains: { type: "string", description: "Comma list from base, arbitrum, ethereum. Default all three." } },
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: true, openWorldHint: true },
+  },
 ];
 
 async function callTool(params, env, ctx, request) {
@@ -902,12 +950,18 @@ async function callTool(params, env, ctx, request) {
         return ok(await toolRiskChurnScore(args, ctx));
       case "verify_financial_claim":
         return ok(await toolVerifyFinancialClaim(args, ctx));
+      case "x402_audit":
+        return ok(await toolX402Audit(args));
+      case "token_report":
+        return ok(await toolTokenReport(args, ctx));
+      case "gas_optimizer":
+        return ok(await toolGasOptimizer(args, ctx));
       default:
         throw new RpcError(JSON_RPC.INVALID_PARAMS, `unknown tool: ${name}`);
     }
   } catch (err) {
     if (err instanceof RpcError) throw err;
-    if (err instanceof ToolError || err instanceof GovError) return toolError(err.message);
+    if (err instanceof ToolError || err instanceof GovError || err instanceof X402Error) return toolError(err.message);
     console.error("tool failure", name, err);
     return toolError("upstream request failed");
   }

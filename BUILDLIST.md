@@ -102,3 +102,28 @@ docs, Stripe Directory, llms.txt//.well-known/mpp.json.
 - [x] Human journey VERIFIED 2026-08-20: pricing page lists all 24 tools,
       buy button creates a live Stripe checkout session ($9 starter), webhook
       credits exactly once on redelivery (signed local test), key works
+
+
+## Round 2: built from live ACP top-seller research (2026-08-20)
+
+Scanned app.virtuals.io/acp/scan. Top agents by transactions: Nox (token
+swaps, 91,976 jobs - EXECUTION, skipped), Otto Market Alpha (56,713 jobs,
+market intel), aixbt (26,550, crypto intel), Capminal (DeFi, skipped).
+Highest-transaction offerings we CAN build (data, keyless, no custody, no
+advice): x402 endpoint audits (API Acre, x402 SellerOps), DexScreener token
+pulls (ArmaBase $0.10), gas optimizers (ArmaBase $0.25). Skipped: swaps,
+cross-chain, leverage/perp signals, alpha (custody/advice constraints).
+
+- [x] x402_audit $0.10 - inspect a public x402 endpoint, report the 402
+      challenge (rails/recipient/Bazaar), pass/fail checklist + verdict; no
+      payment signed. Our differentiation: we built the full x402 seller
+      stack. SSRF-guarded (https only, no IP literals, no internal hosts,
+      443 only, no redirects). src/x402audit.js
+- [x] token_report $0.10 - one-call token due-diligence: price, 24h change,
+      FDV, mcap, volume, deepest-pool liquidity, factual risk flags. Better
+      than the DexScreener pull by combining token+pools and flagging
+      low-liquidity/thin-volume (facts, not advice). onchain.js
+- [x] gas_optimizer $0.05 - live gas across Base/Arbitrum/Ethereum as the USD
+      cost of a standard transfer + cheapest chain. Better than ArmaBase by
+      adding Arbitrum + USD cost. onchain.js
+All verified live and charging. 27 tools total now.

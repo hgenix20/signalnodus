@@ -689,6 +689,9 @@ const TOOL_BLURBS = {
   prediction_markets: "Polymarket implied odds",
   risk_churn_score: "YoY filing churn as one verdict",
   verify_financial_claim: "claim vs as-filed XBRL",
+  x402_audit: "audit a public x402 endpoint",
+  token_report: "token due-diligence data",
+  gas_optimizer: "cheapest-chain gas in USD",
   compare_filings: "the flagship: sentence-level YoY diff",
 };
 
@@ -1103,6 +1106,16 @@ function openApiDoc() {
         q("company", "Ticker or company name.", true),
         q("item", "Item identifier. Default 1A."),
         q("form", "10-K or 10-Q. Default 10-K."),
+      ]),
+      "/v1/x402/audit": path("x402_audit", "Inspect a public x402 endpoint and report its 402 challenge; no payment signed.", [
+        q("url", "Absolute https URL of the x402 resource.", true),
+      ]),
+      "/v1/token/report": path("token_report", "One-call token due-diligence data: price, liquidity, volume, flags.", [
+        q("chain", "base, ethereum, or arbitrum. Default base."),
+        q("token", "Token contract address.", true),
+      ]),
+      "/v1/gas/optimizer": path("gas_optimizer", "Cheapest-chain gas as USD cost of a standard transfer.", [
+        q("chains", "Comma list from base, arbitrum, ethereum."),
       ]),
       "/v1/verify/claim": path("verify_financial_claim", "Deterministic check of a numeric claim against as-filed XBRL.", [
         q("company", "Ticker or company name.", true),

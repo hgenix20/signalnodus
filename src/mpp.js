@@ -32,6 +32,8 @@ import {
   toolVerifyFinancialClaim,
 } from "./mcp.js";
 import { toolGovernmentContracts, toolLobbying } from "./govdata.js";
+import { toolGasOptimizer, toolTokenReport } from "./onchain.js";
+import { toolX402Audit } from "./x402audit.js";
 import { priceOf, dollars, UNITS_PER_DOLLAR, authorize, paymentRequired } from "./billing.js";
 import { PACKS, mintKey } from "./payments.js";
 import { toolEvmBalance, toolEvmGas, toolEvmReceipt, toolTokenPrice } from "./onchain.js";
@@ -308,6 +310,18 @@ const BAZAAR_INFO = {
     q: { company: "AAPL", concept: "Revenues", claimed_value: "391035000000", fiscal_year: "2024" },
     out: { verdict: "supported", actualValue: 391035000000, diffPercent: 0, citation: { accessionNumber: "0000320193-24-000123", form: "10-K" } },
   },
+  "/v1/x402/audit": {
+    q: { url: "https://api.signalnodus.ai/v1/company" },
+    out: { verdict: "healthy", score: "7/8", rails: [{ scheme: "exact", network: "eip155:8453", networkLabel: "Base mainnet", asset: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913", payTo: "0xCF7682647d17803F997308A10c191557d899Ec30" }], hasBazaar: true },
+  },
+  "/v1/token/report": {
+    q: { chain: "base", token: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913" },
+    out: { symbol: "USDC", priceUsd: 1.0, fdvUsd: 61000000000, volume24hUsd: 51234567.0, priceChange24hPct: 0.01, poolCount: 40, topPool: { liquidityUsd: 12000000, dex: "aerodrome" }, flags: [] },
+  },
+  "/v1/gas/optimizer": {
+    q: { chains: "base,arbitrum,ethereum" },
+    out: { ethUsd: 3400.0, referenceTx: "native transfer (21,000 gas)", chains: [{ chain: "base", gasPriceGwei: 0.006, transferFeeUsd: 0.0004 }, { chain: "arbitrum", gasPriceGwei: 0.01, transferFeeUsd: 0.0007 }, { chain: "ethereum", gasPriceGwei: 4.2, transferFeeUsd: 0.30 }], cheapest: "base" },
+  },
   "/v1/credit": {
     q: { pack: "starter" },
     out: { api_key: "sn_live_...", credit: "$10.00", note: "settling the 402 IS the registration; no account exists" },
@@ -404,6 +418,9 @@ const ROUTES = {
   "/v1/gov/lobbying": { tool: "lobbying", run: toolLobbying },
   "/v1/score/churn": { tool: "risk_churn_score", run: toolRiskChurnScore },
   "/v1/verify/claim": { tool: "verify_financial_claim", run: toolVerifyFinancialClaim },
+  "/v1/x402/audit": { tool: "x402_audit", run: toolX402Audit },
+  "/v1/token/report": { tool: "token_report", run: toolTokenReport },
+  "/v1/gas/optimizer": { tool: "gas_optimizer", run: toolGasOptimizer },
 };
 
 export function isMppRoute(pathname) {

@@ -57,6 +57,9 @@ export const PRICING = {
   lobbying: 50, // $0.05 - Senate LDA disclosures
   risk_churn_score: 100, // $0.10 - decision oracle over the diff
   verify_financial_claim: 100, // $0.10 - deterministic XBRL claim check
+  x402_audit: 100, // $0.10 - inspect a public x402 endpoint, no payment signed
+  token_report: 100, // $0.10 - one-call token due-diligence data
+  gas_optimizer: 50, // $0.05 - cheapest gas across chains, USD cost
 };
 
 export function priceOf(tool) {
@@ -159,6 +162,9 @@ const PAYABLE_ROUTE = {
   lobbying: "/v1/gov/lobbying",
   risk_churn_score: "/v1/score/churn",
   verify_financial_claim: "/v1/verify/claim",
+  x402_audit: "/v1/x402/audit",
+  token_report: "/v1/token/report",
+  gas_optimizer: "/v1/gas/optimizer",
 };
 
 // What a caller gets when they are out of credit. Shaped so an agent can act on
