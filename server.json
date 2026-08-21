@@ -3,7 +3,7 @@
   "name": "ai.signalnodus/sec-filings",
   "title": "Signal Nodus SEC Filings",
   "description": "SEC filing diffs, 8-K events, 13D stakes, insider trades, IPOs, federal contracts. Pay per call.",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "websiteUrl": "https://signalnodus.ai",
   "repository": {
     "url": "https://github.com/hgenix20/signalnodus",
