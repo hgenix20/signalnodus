@@ -32,7 +32,7 @@ import {
   toolVerifyFinancialClaim,
 } from "./mcp.js";
 import { toolGovernmentContracts, toolLobbying } from "./govdata.js";
-import { priceOf, dollars, UNITS_PER_DOLLAR } from "./billing.js";
+import { priceOf, dollars, UNITS_PER_DOLLAR, authorize, paymentRequired } from "./billing.js";
 import { PACKS, mintKey } from "./payments.js";
 import { toolEvmBalance, toolEvmGas, toolEvmReceipt, toolTokenPrice } from "./onchain.js";
 import { toolFxRate, toolDomainReport, toolPredictionMarkets } from "./market.js";
@@ -549,6 +549,31 @@ export async function handleMppRoute(request, env, ctx, url) {
   if (!route) return null;
 
   const price = priceOf(route.tool);
+
+  // Prepaid keys work on the REST rail too, not only on MCP. The hosted
+  // marketplace agents that resell these tools do a plain authenticated GET
+  // far more reliably than a crypto settlement, and a buyer holding credit
+  // should not be forced onto a different endpoint to spend it.
+  const authHeader = request.headers.get("authorization") || "";
+  const bearer = /^Bearer\s+(.+)$/i.exec(authHeader.trim())?.[1]?.trim();
+  if (bearer && price > 0) {
+    const decision = await authorize(env, {
+      tool: route.tool,
+      apiKey: bearer,
+      ip: request.headers.get("cf-connecting-ip"),
+    });
+    if (!decision.allowed) {
+      return json(paymentRequired(decision, route.tool), 402);
+    }
+    try {
+      const args = Object.fromEntries(url.searchParams.entries());
+      const data = await route.run(args, ctx);
+      return json({ ...data, _paid: dollars(price) });
+    } catch (err) {
+      console.error("keyed REST call failed", route.tool, err);
+      return json({ error: "request_failed", detail: String(err?.message || err).slice(0, 300) }, 502);
+    }
+  }
 
   // Free tools serve directly. Composing a $0.00 challenge turned the
   // documented proof-of-life call into a payment wall on the REST rail.
