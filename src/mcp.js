@@ -461,10 +461,10 @@ const TOOLS = [
     name: "compare_filings",
     title: "Diff a section across two filings",
     description:
-      "Compare the same item between two filings of a company and return what changed: " +
-      "added and removed passages plus a change ratio. This is the year-over-year risk " +
-      "factor or MD&A comparison, done for you. Pass two accession numbers to pin exactly " +
-      "which filings are compared; otherwise the two most recent of that form are used.",
+      "Year-over-year diff of a 10-K risk-factor or MD&A section: the added and removed " +
+      "passages plus a change ratio, so an agent gets what changed instead of two " +
+      "multi-megabyte filings to parse. Pass two accession numbers to pin exactly which " +
+      "filings are compared; otherwise the two most recent of that form are used.",
     inputSchema: {
       type: "object",
       properties: {
@@ -716,9 +716,9 @@ const TOOLS = [
     name: "activist_stakes",
     title: "13D/13G stakes in a company",
     description:
-      "Schedule 13D and 13G beneficial-ownership filings naming a company over a window, newest " +
-      "first. A fresh 13D is the standard first public signal of an activist position. " +
-      "Costs $0.05 per call.",
+      "The first public signal of an activist position: Schedule 13D and 13G " +
+      "beneficial-ownership filings naming a company over a window, newest first. A fresh " +
+      "13D is where an activist campaign becomes public. Costs $0.05 per call.",
     inputSchema: {
       type: "object",
       properties: {
