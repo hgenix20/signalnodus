@@ -61,6 +61,9 @@ export const PRICING = {
   token_report: 100, // $0.10 - one-call token due-diligence data
   gas_optimizer: 50, // $0.05 - cheapest gas across chains, USD cost
   cftc_positioning: 50, // $0.05 - CFTC Commitments of Traders, weekly positioning
+  energy_data: 50, // $0.05 - EIA prices and grid demand
+  crop_data: 50, // $0.05 - USDA NASS yields, production, stocks
+  trade_flows: 50, // $0.05 - Census monthly trade by HS chapter
 };
 
 export function priceOf(tool) {
@@ -167,6 +170,9 @@ const PAYABLE_ROUTE = {
   token_report: "/v1/token/report",
   gas_optimizer: "/v1/gas/optimizer",
   cftc_positioning: "/v1/cftc/positioning",
+  energy_data: "/v1/energy",
+  crop_data: "/v1/crops",
+  trade_flows: "/v1/trade",
 };
 
 // What a caller gets when they are out of credit. Shaped so an agent can act on

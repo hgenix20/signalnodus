@@ -34,6 +34,7 @@ import {
 } from "./mcp.js";
 import { toolGovernmentContracts, toolLobbying } from "./govdata.js";
 import { toolCftcPositioning } from "./macrodata.js";
+import { toolEnergyData, toolCropData, toolTradeFlows } from "./keyeddata.js";
 import { toolGasOptimizer, toolTokenReport } from "./onchain.js";
 import { toolX402Audit } from "./x402audit.js";
 import { priceOf, dollars, UNITS_PER_DOLLAR, authorize, paymentRequired } from "./billing.js";
@@ -342,6 +343,18 @@ const BAZAAR_INFO = {
       ],
     },
   },
+  "/v1/energy": {
+    q: { series: "electricity_price", state: "CA", sector: "RES", limit: "10" },
+    out: { series: "electricity_price", latestPeriod: "2026-05", rows: [{ period: "2026-05", stateid: "CA", sectorName: "residential", price: "33.25", "price-units": "cents per kilowatt-hour" }] },
+  },
+  "/v1/crops": {
+    q: { commodity: "CORN", statistic: "YIELD", state: "IA", year: "2025" },
+    out: { commodity: "CORN", statistic: "YIELD", returned: 5, rows: [{ description: "CORN, GRAIN - YIELD, MEASURED IN BU / ACRE", year: 2025, state: "IA", value: "210", unit: "BU / ACRE" }] },
+  },
+  "/v1/trade": {
+    q: { direction: "exports", hs_code: "87", year: "2026", month: "05" },
+    out: { direction: "exports", hsChapter: "87", period: "2026-05", rows: [{ country: "TOTAL FOR ALL COUNTRIES", valueUsd: 11615352402, hsDescription: "VEHICLES, OTHER THAN RAILWAY..." }] },
+  },
   "/v1/credit": {
     q: { pack: "starter" },
     out: { api_key: "sn_live_...", credit: "$10.00", note: "settling the 402 IS the registration; no account exists" },
@@ -442,6 +455,9 @@ const ROUTES = {
   "/v1/token/report": { tool: "token_report", run: toolTokenReport },
   "/v1/gas/optimizer": { tool: "gas_optimizer", run: toolGasOptimizer },
   "/v1/cftc/positioning": { tool: "cftc_positioning", run: toolCftcPositioning },
+  "/v1/energy": { tool: "energy_data", run: toolEnergyData },
+  "/v1/crops": { tool: "crop_data", run: toolCropData },
+  "/v1/trade": { tool: "trade_flows", run: toolTradeFlows },
 };
 
 export function isMppRoute(pathname) {
@@ -605,7 +621,7 @@ export async function handleMppRoute(request, env, ctx, url) {
     }
     try {
       const args = Object.fromEntries(url.searchParams.entries());
-      const data = await route.run(args, ctx);
+      const data = await route.run(args, ctx, env);
       return json({ ...data, _paid: dollars(price) });
     } catch (err) {
       console.error("keyed REST call failed", route.tool, err);
@@ -621,7 +637,7 @@ export async function handleMppRoute(request, env, ctx, url) {
   if (price === 0) {
     try {
       const args = Object.fromEntries(url.searchParams.entries());
-      const data = await route.run(args, ctx);
+      const data = await route.run(args, ctx, env);
       return json({ ...data, _paid: "$0.00" });
     } catch (err) {
       console.error("free call failed", route.tool, err);
@@ -642,7 +658,7 @@ export async function handleMppRoute(request, env, ctx, url) {
   if (std?.receipt) {
     try {
       const args = Object.fromEntries(url.searchParams.entries());
-      const data = await route.run(args, ctx);
+      const data = await route.run(args, ctx, env);
       ctx?.waitUntil?.(logSettled(env, route.tool, request, price));
       return withPaymentResponse(json({ ...data, _paid: dollars(price) }), std.receipt);
     } catch (err) {
@@ -688,7 +704,7 @@ export async function handleMppRoute(request, env, ctx, url) {
   // Paid. Do the work, and only then attach the receipt.
   try {
     const args = Object.fromEntries(url.searchParams.entries());
-    const data = await route.run(args, ctx);
+    const data = await route.run(args, ctx, env);
     ctx?.waitUntil?.(logSettled(env, route.tool, request, price));
     return paid.withReceipt(json({ ...data, _paid: dollars(price) }));
   } catch (err) {

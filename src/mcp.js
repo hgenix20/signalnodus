@@ -13,6 +13,7 @@ import { toolX402Audit, X402Error } from "./x402audit.js";
 import { toolEvmBalance, toolEvmGas, toolEvmReceipt, toolTokenPrice } from "./onchain.js";
 import { toolFxRate, toolDomainReport, toolPredictionMarkets } from "./market.js";
 import { toolCftcPositioning, MacroError } from "./macrodata.js";
+import { toolEnergyData, toolCropData, toolTradeFlows, KeyedError } from "./keyeddata.js";
 import { authorize, paymentRequired, priceOf, dollars } from "./billing.js";
 
 const SERVER_NAME = "signalnodus";
@@ -819,6 +820,69 @@ const TOOLS = [
     annotations: { readOnlyHint: true, openWorldHint: true },
   },
   {
+    name: "energy_data",
+    title: "US energy prices and grid demand",
+    description:
+      "Official EIA energy figures, newest period first: electricity_price (retail cents per kWh "
+      + "by state and sector), fuel_price (retail gasoline and diesel dollars per gallon by region), "
+      + "grid_demand (hourly demand and day-ahead forecast by balancing authority). "
+      + "Costs $0.05 per call.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        series: { type: "string", enum: ["electricity_price", "fuel_price", "grid_demand"], description: "Which EIA series to read." },
+        state: { type: "string", description: "Two-letter state code, for electricity_price." },
+        sector: { type: "string", description: "RES, COM, IND, TRA or ALL, for electricity_price. Default RES." },
+        region: { type: "string", description: "Balancing-authority code such as CISO or ERCO, for grid_demand." },
+        limit: { type: "integer", description: "Rows to return, max 100. Default 10." },
+      },
+      required: ["series"],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: true, openWorldHint: true },
+  },
+  {
+    name: "crop_data",
+    title: "US crop and livestock estimates",
+    description:
+      "Official USDA NASS estimates from Quick Stats: yields, production, area planted and "
+      + "harvested, stocks, and prices received, national or by state. Values are as published, "
+      + "including NASS's own suppression markers. Costs $0.05 per call.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        commodity: { type: "string", description: "NASS commodity name, e.g. CORN, SOYBEANS, WHEAT, CATTLE." },
+        statistic: { type: "string", enum: ["YIELD", "PRODUCTION", "AREA HARVESTED", "AREA PLANTED", "STOCKS", "PRICE RECEIVED"], description: "Statistic category. Default YIELD." },
+        year: { type: "string", description: "Four-digit year. Omit for all available." },
+        state: { type: "string", description: "Two-letter state code. Omit for national." },
+        limit: { type: "integer", description: "Rows to return, max 100. Default 20." },
+      },
+      required: ["commodity"],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: true, openWorldHint: true },
+  },
+  {
+    name: "trade_flows",
+    title: "US imports and exports by commodity",
+    description:
+      "Monthly US customs-reported trade value in dollars by trading partner for one HS chapter, "
+      + "from the Census international trade series. Exports are total value, imports are general "
+      + "imports. Costs $0.05 per call.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        direction: { type: "string", enum: ["exports", "imports"], description: "Trade direction. Default exports." },
+        hs_code: { type: "string", description: "Two-digit HS chapter, e.g. 87 vehicles, 10 cereals, 27 mineral fuels." },
+        year: { type: "string", description: "Four-digit year." },
+        month: { type: "string", description: "Month, 01 through 12." },
+      },
+      required: ["hs_code", "year", "month"],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: true, openWorldHint: true },
+  },
+  {
     name: "risk_churn_score",
     title: "Risk-factor churn score",
     description:
@@ -993,6 +1057,12 @@ async function callTool(params, env, ctx, request) {
         return ok(await toolGasOptimizer(args, ctx));
       case "cftc_positioning":
         return ok(await toolCftcPositioning(args, ctx));
+      case "energy_data":
+        return ok(await toolEnergyData(args, ctx, env));
+      case "crop_data":
+        return ok(await toolCropData(args, ctx, env));
+      case "trade_flows":
+        return ok(await toolTradeFlows(args, ctx, env));
       default:
         throw new RpcError(JSON_RPC.INVALID_PARAMS, `unknown tool: ${name}`);
     }
@@ -1002,7 +1072,8 @@ async function callTool(params, env, ctx, request) {
       err instanceof ToolError ||
       err instanceof GovError ||
       err instanceof X402Error ||
-      err instanceof MacroError
+      err instanceof MacroError ||
+      err instanceof KeyedError
     ) {
       return toolError(err.message);
     }
