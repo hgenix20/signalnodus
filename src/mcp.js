@@ -1286,6 +1286,17 @@ export async function toolCompareFilings(args, ctx) {
 
   const diff = diffSections(oldSection, newSection, { maxItems: maxPassages });
 
+  // extractItem returning something is not the same as that something being
+  // readable: Intel's 10-K Item 1A satisfies the check above and still splits
+  // into zero sentences. Reporting that as a 0% diff sells a confident
+  // "nothing changed" for a document we could not parse, and risk_churn_score
+  // turns it into the verdict "boilerplate". Fail instead.
+  if ((diff.summary?.sentencesBefore ?? 0) === 0 && (diff.summary?.sentencesAfter ?? 0) === 0) {
+    throw new ToolError(
+      `Item ${item} did not parse into any sentences in ${older.accession} or ${newer.accession}; no comparison is possible for this filing pair`,
+    );
+  }
+
   return {
     cik,
     company: clean(sub.name),
