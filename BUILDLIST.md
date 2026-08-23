@@ -95,7 +95,7 @@ round each, so they are written down:
 
 Verify after publishing with
 `GET /v0/servers?search=signalnodus` and check `isLatest` on the new
-version. Currently at 1.4.0 (2026-08-23, cftc_positioning).
+version. Currently at 1.5.0 (2026-08-23, energy/crops/trade).
 
 ## Distribution (identified marketplaces)
 
@@ -239,16 +239,24 @@ execution, no advice):
     EIA_API_KEY, NASS_API_KEY, CENSUS_API_KEY (copies in
     .secrets/signalnodus-upstream-keys.env). All three verified live
     against their APIs. Build can proceed.
-  - [ ] `energy_data` $0.05 - EIA open-data API: grid mix, electricity
-        and fuel prices. NOTE: EIA uses bracketed query params
+  - [x] `energy_data` $0.05 LIVE 2026-08-23 - EIA: electricity_price by
+        state and sector, fuel_price by region, grid_demand hourly by
+        balancing authority. EIA uses bracketed query params
         (`data[0]=value`) and rejects them unencoded, same trap as
-        Treasury.
-  - [ ] `crop_data` $0.05 - USDA NASS Quick Stats: yields, plantings,
-        stocks. Verified with CORN/IA/YIELD.
-  - [ ] `trade_flows` $0.05 - Census USA Trade API: imports/exports by
-        commodity and country, monthly. This is the honest
+        Treasury. src/keyeddata.js
+  - [x] `crop_data` $0.05 LIVE 2026-08-23 - USDA NASS Quick Stats:
+        yields, production, area, stocks, prices received. Queries
+        get_counts first so a too-broad request returns advice instead
+        of hitting NASS's 50,000-record refusal. src/keyeddata.js
+  - [x] `trade_flows` $0.05 LIVE 2026-08-23 - Census: monthly trade value
+        by partner for one HS chapter, both directions. The honest
         keyless-adjacent slice of "freight": trade flows, not freight
-        booking.
+        booking. Field names differ by direction (E_/I_COMMODITY,
+        ALL_VAL_MO vs GEN_VAL_MO). src/keyeddata.js
+  - Key handling for all three: named allowlists rather than
+    caller-supplied paths, cache keys built without the API key so no
+    secret reaches the edge cache index, and caller mistakes return 400.
+    Verified live that no response echoes a key.
 - REJECTED as data products under current constraints:
   - Real-time freight rates (DAT et al.): licensed commercial data, no
     primary free source.

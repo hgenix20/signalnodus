@@ -3,7 +3,7 @@
   "name": "ai.signalnodus/sec-filings",
   "title": "Signal Nodus SEC Filings",
   "description": "Year-over-year 10-K diffs, 8-K events, insider trades, 13F, IPOs, XBRL. Pay per call, key or x402.",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "websiteUrl": "https://signalnodus.ai",
   "repository": {
     "url": "https://github.com/hgenix20/signalnodus",
