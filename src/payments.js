@@ -24,12 +24,25 @@ export const PACKS = {
   scale: { cents: 14_900, units: 190_000, label: "Scale" },
 };
 
+// Stripe's stated minimum for a card charge. A pack priced below it can only
+// be bought on the x402 rail, and the pricing document must say so, because an
+// agent that reads the pack list and POSTs the card checkout has no other way
+// to learn which rail can actually sell it.
+const CARD_MINIMUM_CENTS = 50;
+
+function packRails(p) {
+  return p.cents >= CARD_MINIMUM_CENTS
+    ? ["card:/api/checkout", "x402:/v1/credit"]
+    : ["x402:/v1/credit"];
+}
+
 export function packSummary() {
   return Object.entries(PACKS).map(([id, p]) => ({
     id,
     label: p.label,
     price: `$${(p.cents / 100).toFixed(2)}`,
     credits: dollars(p.units),
+    rails: packRails(p),
     // Derived from the live price table, so a price change can never leave
     // the packs advertising counts the credit cannot buy. The hardcoded 250
     // here dated from an early draft price and overstated every pack by 2x.
@@ -92,25 +105,50 @@ export async function createCheckout(request, env) {
   const pack = PACKS[String(packId || "starter")];
   if (!pack) return json({ error: "unknown pack", packs: Object.keys(PACKS) }, 400);
 
+  // Stripe refuses card charges under its minimum, and until this guard the
+  // refusal threw past the handler and the buyer got a bare Cloudflare 1101
+  // page. Say which rail can sell the pack instead.
+  if (pack.cents < CARD_MINIMUM_CENTS) {
+    return json(
+      {
+        error: "pack_below_card_minimum",
+        detail: `The ${pack.label} pack ($${(pack.cents / 100).toFixed(2)}) is under Stripe's $0.50 card minimum. Buy it with an x402 payment instead: GET https://api.signalnodus.ai/v1/credit?pack=${packId} and settle the 402 challenge.`,
+        rails: packRails(pack),
+      },
+      400,
+    );
+  }
+
   // Mint the key now and store only its hash. If payment never completes the
   // row simply stays at zero credits and is worthless.
   const apiKey = newApiKey();
   const keyHash = await hashKey(apiKey);
 
-  const session = await stripe(env, "checkout/sessions", {
-    mode: "payment",
-    "line_items[0][price_data][currency]": "usd",
-    "line_items[0][price_data][unit_amount]": String(pack.cents),
-    "line_items[0][price_data][product_data][name]": `Signal Nodus ${pack.label} credits`,
-    "line_items[0][price_data][product_data][description]":
-      `${dollars(pack.units)} of API credit. No subscription, no expiry.`,
-    "line_items[0][quantity]": "1",
-    success_url: `https://signalnodus.ai/key?k=${apiKey}`,
-    cancel_url: "https://signalnodus.ai/pricing",
-    "metadata[key_hash]": keyHash,
-    "metadata[units]": String(pack.units),
-    "metadata[pack]": String(packId),
-  });
+  let session;
+  try {
+    session = await stripe(env, "checkout/sessions", {
+      mode: "payment",
+      "line_items[0][price_data][currency]": "usd",
+      "line_items[0][price_data][unit_amount]": String(pack.cents),
+      "line_items[0][price_data][product_data][name]": `Signal Nodus ${pack.label} credits`,
+      "line_items[0][price_data][product_data][description]":
+        `${dollars(pack.units)} of API credit. No subscription, no expiry.`,
+      "line_items[0][quantity]": "1",
+      success_url: `https://signalnodus.ai/key?k=${apiKey}`,
+      cancel_url: "https://signalnodus.ai/pricing",
+      "metadata[key_hash]": keyHash,
+      "metadata[units]": String(pack.units),
+      "metadata[pack]": String(packId),
+    });
+  } catch (err) {
+    // A Stripe refusal is a payment-lane outage for this buyer, and it must
+    // come back as a legible error rather than an unhandled exception.
+    console.error("stripe checkout session failed", err);
+    return json(
+      { error: "checkout_unavailable", detail: String(err?.message || err).slice(0, 200) },
+      502,
+    );
+  }
 
   try {
     await env.BILLING.prepare(

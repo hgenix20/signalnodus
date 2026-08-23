@@ -516,15 +516,15 @@ async function settleStandardX402(request, env, priceUnits, resourceUrl) {
   const auth = payment.payload.authorization;
   const wanted = String(priceUnits * 1000);
   if (env.BASE_DEPOSIT_ADDRESS && String(auth.to).toLowerCase() !== String(env.BASE_DEPOSIT_ADDRESS).toLowerCase()) {
-    return { failed: json({ error: "payment_invalid", detail: "authorization.to is not this service's receiving address" }, 402) };
+    return { failed: json({ error: "payment_invalid", detail: "authorization.to is not this service's receiving address" }, 402), reason: "wrong_recipient" };
   }
   // The header is attacker-controlled; BigInt throws on anything non-numeric
   // and nothing above the fetch handler catches, so validate before parsing.
   if (!/^\d+$/.test(String(auth.value ?? ""))) {
-    return { failed: json({ error: "payment_invalid", detail: "authorization.value must be a decimal string of atomic USDC" }, 402) };
+    return { failed: json({ error: "payment_invalid", detail: "authorization.value must be a decimal string of atomic USDC" }, 402), reason: "malformed_value" };
   }
   if (BigInt(auth.value) < BigInt(wanted)) {
-    return { failed: json({ error: "payment_invalid", detail: `authorization.value below price; need ${wanted} atomic USDC` }, 402) };
+    return { failed: json({ error: "payment_invalid", detail: `authorization.value below price; need ${wanted} atomic USDC` }, 402), reason: "underpaid" };
   }
 
   const requirements = v1Requirements(env, priceUnits, resourceUrl);
@@ -533,14 +533,14 @@ async function settleStandardX402(request, env, priceUnits, resourceUrl) {
   const verify = await facilitatorCall(env, "verify", body);
   if (!verify.ok || verify.data?.isValid === false) {
     const reason = verify.data?.invalidReason || verify.data?.error || verify.raw || `verify returned ${verify.status}`;
-    return { failed: json({ error: "payment_invalid", detail: String(reason).slice(0, 200) }, 402) };
+    return { failed: json({ error: "payment_invalid", detail: String(reason).slice(0, 200) }, 402), reason: `verify:${String(reason).slice(0, 80)}` };
   }
 
   const settle = await facilitatorCall(env, "settle", body);
   const success = settle.ok && (settle.data?.success === true || settle.data?.transaction || settle.data?.txHash);
   if (!success) {
     const reason = settle.data?.errorReason || settle.data?.error || settle.raw || `settle returned ${settle.status}`;
-    return { failed: json({ error: "settlement_failed", detail: String(reason).slice(0, 200) }, 402) };
+    return { failed: json({ error: "settlement_failed", detail: String(reason).slice(0, 200) }, 402), reason: `settle:${String(reason).slice(0, 80)}` };
   }
 
   return {
@@ -609,7 +609,7 @@ export async function handleMppRoute(request, env, ctx, url) {
   // the facilitator, serve on success, and say exactly why on failure.
   const std = await settleStandardX402(request, env, price, url.toString());
   if (std?.failed) {
-    ctx?.waitUntil?.(logChallenge(env, route.tool, request));
+    ctx?.waitUntil?.(logPaymentFailure(env, route.tool, request, std.reason));
     return std.failed;
   }
   if (std?.receipt) {
@@ -724,7 +724,7 @@ async function handleCreditPurchase(request, env, url, ctx) {
   // wall. Settle-first, then mint; the key exists only after money moved.
   const std = await settleStandardX402(request, env, Math.round(pack.cents * 10), url.toString());
   if (std?.failed) {
-    ctx?.waitUntil?.(logChallenge(env, "credit_purchase", request));
+    ctx?.waitUntil?.(logPaymentFailure(env, "credit_purchase", request, std.reason));
     return std.failed;
   }
   if (std?.receipt) {
@@ -814,6 +814,29 @@ async function logChallenge(env, tool, request) {
       .run();
   } catch (err) {
     console.error("could not log challenge", err);
+  }
+}
+
+// A payment that was ATTEMPTED and refused. Until this existed, a failed
+// attempt and a plain unpaid challenge wrote identical rows, so "agents refuse
+// to pay" and "agents try to pay and cannot" were indistinguishable after the
+// fact, and those two readings of an empty till have opposite fixes. Same
+// subject shape as the challenge log so the populations join; the tool prefix
+// carries the distinction and the refusal reason goes to the Worker log.
+async function logPaymentFailure(env, tool, request, reason) {
+  if (!env?.BILLING) return;
+  const now = new Date().toISOString();
+  const ip = request.headers.get("cf-connecting-ip") || "unknown";
+  const agent = (request.headers.get("user-agent") || "none").slice(0, 80);
+  console.warn(`payment attempt refused: tool=${tool} ip=${ip} ua=${agent} reason=${reason || "unknown"}`);
+  try {
+    await env.BILLING.prepare(
+      "INSERT INTO usage (subject, tool, cost, billable, day, created_at) VALUES (?, ?, 0, 0, ?, ?)",
+    )
+      .bind(`challenge:${ip}|${agent}`, `payfail:${tool}`, now.slice(0, 10), now)
+      .run();
+  } catch (err) {
+    console.error("could not log payment failure", err);
   }
 }
 
