@@ -60,6 +60,7 @@ export const PRICING = {
   x402_audit: 100, // $0.10 - inspect a public x402 endpoint, no payment signed
   token_report: 100, // $0.10 - one-call token due-diligence data
   gas_optimizer: 50, // $0.05 - cheapest gas across chains, USD cost
+  cftc_positioning: 50, // $0.05 - CFTC Commitments of Traders, weekly positioning
 };
 
 export function priceOf(tool) {
@@ -165,6 +166,7 @@ const PAYABLE_ROUTE = {
   x402_audit: "/v1/x402/audit",
   token_report: "/v1/token/report",
   gas_optimizer: "/v1/gas/optimizer",
+  cftc_positioning: "/v1/cftc/positioning",
 };
 
 // What a caller gets when they are out of credit. Shaped so an agent can act on

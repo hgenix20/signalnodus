@@ -12,6 +12,7 @@ import { toolGasOptimizer, toolTokenReport } from "./onchain.js";
 import { toolX402Audit, X402Error } from "./x402audit.js";
 import { toolEvmBalance, toolEvmGas, toolEvmReceipt, toolTokenPrice } from "./onchain.js";
 import { toolFxRate, toolDomainReport, toolPredictionMarkets } from "./market.js";
+import { toolCftcPositioning, MacroError } from "./macrodata.js";
 import { authorize, paymentRequired, priceOf, dollars } from "./billing.js";
 
 const SERVER_NAME = "signalnodus";
@@ -228,7 +229,10 @@ class RpcError extends Error {
 // seller is broken and to retry later, which it will do forever against an
 // input that can never succeed.
 export function isInvalidParams(err) {
-  return err instanceof RpcError && err.code === JSON_RPC.INVALID_PARAMS;
+  if (err instanceof RpcError && err.code === JSON_RPC.INVALID_PARAMS) return true;
+  // Tool modules outside this file flag their own caller-mistake errors, since
+  // they do not share the RpcError type.
+  return err?.invalidParams === true;
 }
 
 class ToolError extends Error {}
@@ -792,6 +796,29 @@ const TOOLS = [
     annotations: { readOnlyHint: true, openWorldHint: true },
   },
   {
+    name: "cftc_positioning",
+    title: "CFTC futures positioning",
+    description:
+      "Weekly Commitments of Traders positioning for a futures contract: non-commercial " +
+      "(speculative) and commercial (hedging) longs, shorts and net, net as a share of open " +
+      "interest, and the week-over-week changes. Match by contract name fragment such as " +
+      "CRUDE OIL, WHEAT, GOLD or S&P 500. The disclosed record only, no forecast. " +
+      "Costs $0.05 per call.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        market: {
+          type: "string",
+          description: "Contract name fragment, e.g. CRUDE OIL, WHEAT, GOLD, COPPER, S&P 500.",
+        },
+        weeks: { type: "integer", description: "Weeks of history per contract, max 26. Default 4." },
+      },
+      required: ["market"],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: true, openWorldHint: true },
+  },
+  {
     name: "risk_churn_score",
     title: "Risk-factor churn score",
     description:
@@ -964,12 +991,21 @@ async function callTool(params, env, ctx, request) {
         return ok(await toolTokenReport(args, ctx));
       case "gas_optimizer":
         return ok(await toolGasOptimizer(args, ctx));
+      case "cftc_positioning":
+        return ok(await toolCftcPositioning(args, ctx));
       default:
         throw new RpcError(JSON_RPC.INVALID_PARAMS, `unknown tool: ${name}`);
     }
   } catch (err) {
     if (err instanceof RpcError) throw err;
-    if (err instanceof ToolError || err instanceof GovError || err instanceof X402Error) return toolError(err.message);
+    if (
+      err instanceof ToolError ||
+      err instanceof GovError ||
+      err instanceof X402Error ||
+      err instanceof MacroError
+    ) {
+      return toolError(err.message);
+    }
     console.error("tool failure", name, err);
     return toolError("upstream request failed");
   }
@@ -1374,7 +1410,12 @@ async function resolveCik(input, ctx) {
   const ticker = value.toUpperCase();
   const map = await tickerMap(ctx);
   const cik = map.get(ticker);
-  if (!cik) throw new ToolError(`no SEC registrant found for ticker ${ticker}`);
+  // A well-formed ticker that no registrant uses is still the caller's
+  // mistake, not ours: retrying it can never succeed, so it must not come back
+  // as a 5xx that invites an agent to retry forever.
+  if (!cik) {
+    throw new RpcError(JSON_RPC.INVALID_PARAMS, `no SEC registrant found for ticker ${ticker}`);
+  }
   return cik;
 }
 

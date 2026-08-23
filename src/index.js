@@ -950,6 +950,7 @@ const TOOL_BLURBS = {
   latest_filings: "live market-wide filing feed",
   government_contracts: "federal awards from USAspending",
   lobbying: "Senate LDA disclosures by client",
+  cftc_positioning: "CFTC futures positioning, weekly",
   evm_balance: "native balance, Base or Ethereum",
   evm_gas: "current gas price",
   evm_receipt: "transaction receipt",
@@ -1503,6 +1504,14 @@ function openApiDoc() {
         q("days", "Lookback window in days, 30-1825."),
         q("limit", "Awards to return, max 25."),
       ]),
+      "/v1/cftc/positioning": path(
+        "cftc_positioning",
+        "CFTC Commitments of Traders positioning for a futures contract.",
+        [
+          q("market", "Contract name fragment, e.g. CRUDE OIL, WHEAT, GOLD.", true),
+          q("weeks", "Weeks of history per contract, max 26."),
+        ],
+      ),
       "/v1/gov/lobbying": path("lobbying", "US Senate LDA lobbying disclosures for a client company.", [
         q("company", "Client company name.", true),
         q("year", "Filing year filter."),

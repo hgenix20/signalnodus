@@ -33,6 +33,7 @@ import {
   isInvalidParams,
 } from "./mcp.js";
 import { toolGovernmentContracts, toolLobbying } from "./govdata.js";
+import { toolCftcPositioning } from "./macrodata.js";
 import { toolGasOptimizer, toolTokenReport } from "./onchain.js";
 import { toolX402Audit } from "./x402audit.js";
 import { priceOf, dollars, UNITS_PER_DOLLAR, authorize, paymentRequired } from "./billing.js";
@@ -323,6 +324,24 @@ const BAZAAR_INFO = {
     q: { chains: "base,arbitrum,ethereum" },
     out: { ethUsd: 3400.0, referenceTx: "native transfer (21,000 gas)", chains: [{ chain: "base", gasPriceGwei: 0.006, transferFeeUsd: 0.0004 }, { chain: "arbitrum", gasPriceGwei: 0.01, transferFeeUsd: 0.0007 }, { chain: "ethereum", gasPriceGwei: 4.2, transferFeeUsd: 0.30 }], cheapest: "base" },
   },
+  "/v1/cftc/positioning": {
+    q: { market: "CRUDE OIL", weeks: "4" },
+    out: {
+      query: "CRUDE OIL",
+      matchedContracts: 2,
+      latestReportDate: "2026-08-18",
+      contracts: [
+        {
+          market: "WTI FINANCIAL CRUDE OIL - NEW YORK MERCANTILE EXCHANGE",
+          latest: {
+            reportDate: "2026-08-18",
+            openInterest: 1850000,
+            nonCommercial: { long: 310000, short: 190000, net: 120000, netPctOfOpenInterest: 6.5 },
+          },
+        },
+      ],
+    },
+  },
   "/v1/credit": {
     q: { pack: "starter" },
     out: { api_key: "sn_live_...", credit: "$10.00", note: "settling the 402 IS the registration; no account exists" },
@@ -422,6 +441,7 @@ const ROUTES = {
   "/v1/x402/audit": { tool: "x402_audit", run: toolX402Audit },
   "/v1/token/report": { tool: "token_report", run: toolTokenReport },
   "/v1/gas/optimizer": { tool: "gas_optimizer", run: toolGasOptimizer },
+  "/v1/cftc/positioning": { tool: "cftc_positioning", run: toolCftcPositioning },
 };
 
 export function isMppRoute(pathname) {
