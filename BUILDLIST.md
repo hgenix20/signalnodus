@@ -73,6 +73,30 @@ same Worker, same billing. Prices follow the existing ladder.
 - [x] dashboard label escaping (latent XSS)
 - [x] banned words in site copy (index.js), per writing conventions
 
+## How to publish to the official MCP registry (no CLI needed)
+
+The `mcp-publisher` npm package is a stdio server, not the publisher CLI,
+and the Go binary is not installed here. Publish over the HTTP API instead,
+which is what the registry's HTTP domain auth is for. Three gotchas cost a
+round each, so they are written down:
+
+1. Auth is `POST /v0/auth/http` with `{domain, timestamp, signed_timestamp}`.
+   NOT the DNS endpoint: DNS auth needs a TXT record we do not have, and
+   fails with "no such host". The timestamp is RFC3339 (`%Y-%m-%dT%H:%M:%SZ`)
+   signed raw with the Ed25519 key at `.secrets/mcp-registry-key.pem`
+   (`openssl pkeyutl -sign -rawin`), hex-encoded. It expires in seconds, so
+   sign and publish in ONE script rather than two shell calls.
+2. The public half is already served at `/.well-known/mcp-registry-auth`
+   and is what the registry checks. Do not change it.
+3. `POST /v0/publish` takes the contents of server.json at the TOP level.
+   Wrapping it as `{"server": {...}}` returns 422, and so does adding an
+   envelope `$schema`. Bump `version` in server.json first or the publish
+   is rejected as a duplicate.
+
+Verify after publishing with
+`GET /v0/servers?search=signalnodus` and check `isLatest` on the new
+version. Currently at 1.4.0 (2026-08-23, cftc_positioning).
+
 ## Distribution (identified marketplaces)
 
 Already listed: official MCP registry (propagates to mcp.so/Glama/
@@ -194,11 +218,22 @@ constraints (keyless or free-key primary sources, no custody, no
 execution, no advice):
 
 - BUILDABLE, scope-consistent (still government primary records):
-  - [ ] `cftc_positioning` $0.05 - CFTC Commitments of Traders via the
-        public Socrata API (keyless): weekly positioning in oil, metals,
-        ag, rates. The primary record behind commodity sentiment.
-  - [ ] `treasury_data` $0.01-0.05 - fiscaldata.treasury.gov (keyless):
-        auction results, debt, rates.
+  - [x] `cftc_positioning` $0.05 LIVE 2026-08-23 - CFTC Commitments of
+        Traders via the public Socrata API (keyless): non-commercial and
+        commercial long/short/net, net as a share of open interest, and
+        week-over-week changes, grouped by contract so positions are never
+        summed across exchanges by accident. Verified live on CRUDE OIL,
+        WHEAT, GOLD and S&P 500. src/macrodata.js
+  - [ ] `treasury_data` BLOCKED, code written and NOT registered.
+        Cloudflare Workers cannot complete a TLS handshake with
+        api.fiscaldata.treasury.gov: every fetch from the deployed Worker
+        returns 525 or hangs to timeout, while the same URL answers in
+        ~0.5s from a normal client. Confirmed by pointing our own
+        x402_audit at it from the Worker (verdict: unreachable, 525). SEC
+        EDGAR and USAspending are fine from the same Worker, so it is that
+        host, not .gov generally. The tool is complete in src/macrodata.js
+        behind a comment; re-registering is a four-line change IF a fetch
+        from the deployed Worker ever succeeds. Do not list it before then.
   - [ ] `energy_data` $0.05 - EIA open-data API: grid mix, electricity
         and fuel prices. Free key, instant signup; queue the key on
         Kameron like other keyed upstreams.
