@@ -234,13 +234,19 @@ execution, no advice):
         host, not .gov generally. The tool is complete in src/macrodata.js
         behind a comment; re-registering is a four-line change IF a fetch
         from the deployed Worker ever succeeds. Do not list it before then.
+  - KEYS OBTAINED 2026-08-23, no longer queued on Kameron. Registered
+    self-serve via hgenix@agentmail.to and stored as Worker secrets
+    EIA_API_KEY, NASS_API_KEY, CENSUS_API_KEY (copies in
+    .secrets/signalnodus-upstream-keys.env). All three verified live
+    against their APIs. Build can proceed.
   - [ ] `energy_data` $0.05 - EIA open-data API: grid mix, electricity
-        and fuel prices. Free key, instant signup; queue the key on
-        Kameron like other keyed upstreams.
+        and fuel prices. NOTE: EIA uses bracketed query params
+        (`data[0]=value`) and rejects them unencoded, same trap as
+        Treasury.
   - [ ] `crop_data` $0.05 - USDA NASS Quick Stats: yields, plantings,
-        stocks. Free key, same queue.
+        stocks. Verified with CORN/IA/YIELD.
   - [ ] `trade_flows` $0.05 - Census USA Trade API: imports/exports by
-        commodity and country, monthly. Free key. This is the honest
+        commodity and country, monthly. This is the honest
         keyless-adjacent slice of "freight": trade flows, not freight
         booking.
 - REJECTED as data products under current constraints:
