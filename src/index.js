@@ -211,6 +211,9 @@ async function apexResponse(request, url, env, ctx) {
   // happened: our public agent-readiness card read "MCP Support: No" while the
   // MCP server was serving traffic.
   if (url.pathname === "/.well-known/mcp.json") return json(mcpDescriptor());
+  if (url.pathname === "/.well-known/agent.json" || url.pathname === "/.well-known/agent-card.json") {
+    return json(agentCard());
+  }
   if (url.pathname === "/openapi.json") return json(openApiDoc());
   // Proves to the official MCP registry that we own signalnodus.ai, which is
   // what lets us publish under the ai.signalnodus namespace. Public key only.
@@ -412,6 +415,9 @@ function apiResponse(request, url, env) {
   // API host unregisterable.
   if (url.pathname === "/openapi.json") return json(openApiDoc());
   if (url.pathname === "/.well-known/mcp.json") return json(mcpDescriptor());
+  if (url.pathname === "/.well-known/agent.json" || url.pathname === "/.well-known/agent-card.json") {
+    return json(agentCard());
+  }
   // 402 Index domain-ownership proof. Public hash, instant listing approval.
   if (url.pathname === "/.well-known/402index-verify.txt") {
     return asset("7c8bf86a54822a288ab3ac9ad28d2319185dd1c2f7e03b4ad168f9ccc43cf032", "text/plain");
@@ -1307,6 +1313,53 @@ function mcpDescriptor() {
       // human, because paying IS the registration.
       autonomous_credential: "https://api.signalnodus.ai/v1/credit?pack=starter",
     },
+    contact_email: "hgenix@agentmail.to",
+  };
+}
+
+// A2A-style agent card. A2A directories and clients look for it at
+// /.well-known/agent.json (original spec path) and /.well-known/agent-card.json
+// (the renamed one); serve both. The card is honest about transports: this
+// service speaks MCP and plain HTTP with x402, not A2A JSON-RPC, and the card
+// says so rather than letting a strict A2A client discover it by failing.
+function agentCard() {
+  return {
+    name: "Signal Nodus",
+    description:
+      "Market intelligence for autonomous agents, from primary records only: " +
+      "sentence-level year-over-year diffs of SEC 10-K/10-Q sections pinned to " +
+      "accession numbers, 8-K events, insider trades, 13F holdings, XBRL claim " +
+      "verification, US federal contracts and lobbying, and market utilities. " +
+      "Interfaces: MCP (streamable HTTP) and plain HTTP GET. Not an A2A JSON-RPC " +
+      "endpoint. Payment: per-call x402 on Base (USDC) or a prepaid credit key; " +
+      "no account, no subscription, no human signup.",
+    url: "https://api.signalnodus.ai",
+    version: "0.3.0",
+    documentationUrl: "https://signalnodus.ai",
+    provider: { organization: "Signal Nodus (autonomous agent, human-owned)", url: "https://signalnodus.ai" },
+    capabilities: { streaming: false, pushNotifications: false, stateTransitionHistory: false },
+    defaultInputModes: ["application/json"],
+    defaultOutputModes: ["application/json"],
+    additionalInterfaces: [
+      { transport: "mcp+streamable-http", url: "https://mcp.signalnodus.ai/" },
+      { transport: "http+json", url: "https://api.signalnodus.ai", openapi: "https://api.signalnodus.ai/openapi.json" },
+    ],
+    payment: {
+      protocols: ["x402", "mpp"],
+      networks: ["eip155:8453"],
+      assets: ["USDC"],
+      per_call: true,
+      account_required: false,
+      autonomous_credential: "https://api.signalnodus.ai/v1/credit?pack=starter",
+    },
+    // Derived from the live route table, same as every other discovery doc
+    // here; a hand list would drift the moment a tool ships.
+    skills: describeRoutes().map((r) => ({
+      id: r.tool,
+      name: r.tool,
+      description: `GET ${r.path}, ${r.price} per call. Params: ${r.params || "none"}.`,
+      tags: ["market-data", "per-call", "x402"],
+    })),
     contact_email: "hgenix@agentmail.to",
   };
 }

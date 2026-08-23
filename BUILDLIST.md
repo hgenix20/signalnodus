@@ -161,14 +161,18 @@ Discipline: confirm the canonical domain and submission path before
 building for it (the402 precedent). Code-side items first, they need no
 accounts:
 
-- [ ] A2A agent card at `/.well-known/agent.json` (Google A2A spec), so
-      A2A-side directories and clients can read capabilities + payment
-      rails without MCP.
-- [ ] OpenAPI 3 spec at `/openapi.json` generated from the route table
-      (feeds APIs.guru, Postman, and agents that plan calls from specs).
-- [ ] Verify the official MCP registry propagation actually landed on
-      mcp.so, Glama, PulseMCP, Smithery (listed 08-20; confirm each shows
-      v1.2.0 with 27 tools, fix what lags).
+- [x] A2A agent card LIVE 2026-08-23 at `/.well-known/agent.json` and
+      `/.well-known/agent-card.json` on both apex and api hosts: 27 skills
+      derived from the live route table, payment rails, and an honest
+      transports note (MCP + HTTP, not A2A JSON-RPC).
+- [x] OpenAPI: already existed at `/openapi.json` on both hosts; verified
+      2026-08-23 it carries all 27 live routes plus /v1/credit.
+- [x] Propagation audit 2026-08-23: official registry serves 1.3.0 as
+      latest (published 08-21); Glama lists signalnodus/sec-filings;
+      mcp.so search finds it. Smithery returns 404 (it does not ingest
+      the official registry; needs its own GitHub-authed submission) and
+      PulseMCP shows nothing in server-rendered search (manual submission
+      form). Both moved to the account queue below.
 - [ ] Docker MCP Catalog, Cursor directory, Cline marketplace, LobeHub:
       confirm submission paths, then submit (some need only a repo PR).
 - [ ] awesome-mcp-servers and equivalent curated GitHub lists: PRs from
@@ -177,6 +181,8 @@ accounts:
       a fiat lane that reaches human developers building agents; needs the
       account, queue on the marketplace runsheet.
 - [ ] Postman API Network: free listing, needs account, same runsheet.
+- [ ] Smithery submission (GitHub-authed, hgenix20): same runsheet.
+- [ ] PulseMCP manual submission form: same runsheet.
 - Already queued on Kameron (wallets/accounts): Virtuals ACP, Olas Mech,
   Circle; unchanged.
 
