@@ -223,6 +223,14 @@ class RpcError extends Error {
   }
 }
 
+// The REST rail needs to tell a caller's mistake apart from ours. An invalid
+// ticker is the caller's to fix and returning 5xx for it tells an agent the
+// seller is broken and to retry later, which it will do forever against an
+// input that can never succeed.
+export function isInvalidParams(err) {
+  return err instanceof RpcError && err.code === JSON_RPC.INVALID_PARAMS;
+}
+
 class ToolError extends Error {}
 
 function isAllowedOrigin(origin) {

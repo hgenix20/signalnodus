@@ -30,6 +30,7 @@ import {
   toolIpoPipeline,
   toolRiskChurnScore,
   toolVerifyFinancialClaim,
+  isInvalidParams,
 } from "./mcp.js";
 import { toolGovernmentContracts, toolLobbying } from "./govdata.js";
 import { toolGasOptimizer, toolTokenReport } from "./onchain.js";
@@ -588,7 +589,10 @@ export async function handleMppRoute(request, env, ctx, url) {
       return json({ ...data, _paid: dollars(price) });
     } catch (err) {
       console.error("keyed REST call failed", route.tool, err);
-      return json({ error: "request_failed", detail: String(err?.message || err).slice(0, 300) }, 502);
+      return json(
+        { error: isInvalidParams(err) ? "invalid_request" : "request_failed", detail: String(err?.message || err).slice(0, 300) },
+        isInvalidParams(err) ? 400 : 502,
+      );
     }
   }
 
@@ -601,7 +605,10 @@ export async function handleMppRoute(request, env, ctx, url) {
       return json({ ...data, _paid: "$0.00" });
     } catch (err) {
       console.error("free call failed", route.tool, err);
-      return json({ error: "request_failed", detail: String(err?.message || err).slice(0, 300) }, 502);
+      return json(
+        { error: isInvalidParams(err) ? "invalid_request" : "request_failed", detail: String(err?.message || err).slice(0, 300) },
+        isInvalidParams(err) ? 400 : 502,
+      );
     }
   }
 
