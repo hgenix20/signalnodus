@@ -214,7 +214,7 @@ async function apexResponse(request, url, env, ctx) {
   if (url.pathname === "/.well-known/agent.json" || url.pathname === "/.well-known/agent-card.json") {
     return json(agentCard());
   }
-  if (url.pathname === "/openapi.json") return json(openApiDoc());
+  if (url.pathname === "/openapi.json") return json(openApiDoc(env));
   // Proves to the official MCP registry that we own signalnodus.ai, which is
   // what lets us publish under the ai.signalnodus namespace. Public key only.
   if (url.pathname === "/.well-known/mcp-registry-auth") {
@@ -413,7 +413,7 @@ function apiResponse(request, url, env) {
   // registration resolves the ORIGIN of a submitted endpoint URL and fetches
   // its openapi.json from there, so serving these only on the apex made the
   // API host unregisterable.
-  if (url.pathname === "/openapi.json") return json(openApiDoc());
+  if (url.pathname === "/openapi.json") return json(openApiDoc(env));
   if (url.pathname === "/.well-known/mcp.json") return json(mcpDescriptor());
   if (url.pathname === "/.well-known/agent.json" || url.pathname === "/.well-known/agent-card.json") {
     return json(agentCard());
@@ -1395,7 +1395,54 @@ function q(name, desc, required = false) {
   return { name, in: "query", required, schema: { type: "string" }, description: desc };
 }
 
-function openApiDoc() {
+// USDC on Base, the asset every priced route quotes.
+const USDC_BASE_ASSET = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
+
+// Machine-readable payment terms per operation, in the shape MPP indexes
+// read. Without this an OpenAPI crawler sees ordinary GET routes and files
+// the whole API as unpriced: MPPScan skipped all 32 of ours as "unprotected"
+// on 2026-08-23 for exactly that, which also left us unmatched in every
+// downstream router that joins against its registry. Derived from the live
+// price table so it cannot drift from what the meter actually charges.
+function paymentInfo(tool, recipient) {
+  const units = priceOf(tool);
+  if (!units || !recipient) return null;
+  // Prices are tenths of a cent; USDC has 6 decimals, so one unit is 1000
+  // atomic USDC.
+  const atomic = String(units * 1000);
+  return {
+    amount: atomic,
+    currency: USDC_BASE_ASSET,
+    description: `1 ${tool} call`,
+    intent: "charge",
+    method: "evm",
+    network: "8453",
+    recipient,
+    price: { mode: "fixed", currency: "USD", amount: (units / 1000).toFixed(6) },
+    protocols: [
+      {
+        x402: {
+          scheme: "exact",
+          network: "eip155:8453",
+          currency: USDC_BASE_ASSET,
+          recipient,
+        },
+      },
+      {
+        mpp: {
+          method: "evm",
+          intent: "charge",
+          network: "8453",
+          currency: USDC_BASE_ASSET,
+          recipient,
+        },
+      },
+    ],
+  };
+}
+
+function openApiDoc(env) {
+  const recipient = env?.BASE_DEPOSIT_ADDRESS || null;
   const paid = {
     description:
       "Payment required. Carries WWW-Authenticate: Payment and an x402 " +
@@ -1403,14 +1450,21 @@ function openApiDoc() {
     content: { "application/problem+json": { schema: { type: "object" } } },
   };
   const ok = { description: "Success", content: { "application/json": { schema: { type: "object" } } } };
-  const path = (tool, summary, params) => ({
-    get: {
-      summary,
-      description: `${summary} Costs ${priced(tool)} per call. No account and no subscription.`,
-      parameters: params,
-      responses: { 200: ok, 402: paid },
-    },
-  });
+  const path = (tool, summary, params) => {
+    const pay = paymentInfo(tool, recipient);
+    return {
+      get: {
+        summary,
+        description: `${summary} Costs ${priced(tool)} per call. No account and no subscription.`,
+        parameters: params,
+        // An explicit auth mode on every route, priced or free. Crawlers that
+        // cannot tell how a route authenticates skip it rather than guess.
+        security: pay ? [{ bearerAuth: [] }, { x402Payment: [] }] : [],
+        responses: pay ? { 200: ok, 402: paid } : { 200: ok },
+        ...(pay ? { "x-payment-info": pay } : {}),
+      },
+    };
+  };
 
   return {
     openapi: "3.1.0",
@@ -1427,8 +1481,35 @@ function openApiDoc() {
         "https://mcp.signalnodus.ai/ .",
       contact: { email: "hgenix@agentmail.to" },
       license: { name: "Data from US SEC EDGAR, a public primary source" },
+      // Indexes read this to tell an agent how to actually use the API.
+      "x-guidance":
+        "Every route is a single GET with query parameters and returns JSON. " +
+        "Start with GET /v1/company to resolve a ticker to a CIK; it is free and " +
+        "proves the service works before any payment. The flagship is GET /v1/compare, " +
+        "a sentence-level year-over-year diff of one 10-K or 10-Q item, pinned to " +
+        "accession numbers so an amendment cannot move the baseline. Pay per call " +
+        "either by settling the x402 challenge on the 402 response, or by sending a " +
+        "prepaid key as Authorization: Bearer <key>; a key can be bought without a " +
+        "human at GET /v1/credit. There is no signup and no subscription. A 400 means " +
+        "the request itself is wrong and will never succeed unchanged; a 5xx means the " +
+        "service failed rather than the request.",
     },
     servers: [{ url: "https://api.signalnodus.ai" }],
+    components: {
+      securitySchemes: {
+        bearerAuth: {
+          type: "http",
+          scheme: "bearer",
+          description: "Prepaid credit key: `Authorization: Bearer <key>`. Buy one with no human at GET /v1/credit.",
+        },
+        x402Payment: {
+          type: "apiKey",
+          in: "header",
+          name: "X-PAYMENT",
+          description: "Settle the x402 challenge from the 402 response and repeat the request with the signed payment.",
+        },
+      },
+    },
     paths: {
       "/v1/company": path("lookup_company", "Resolve a ticker or name to a CIK and metadata.", [
         q("company", "Ticker or company name.", true),
