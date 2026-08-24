@@ -418,6 +418,17 @@ function apiResponse(request, url, env) {
   if (url.pathname === "/.well-known/agent.json" || url.pathname === "/.well-known/agent-card.json") {
     return json(agentCard());
   }
+  // The MPP manifest belongs on the host that serves the paid routes, not
+  // only on the apex. Index crawlers resolve the origin they were given and
+  // then probe ITS routes for a payment challenge: pointed at the apex they
+  // find the manifest but every /v1 path 404s, so the seller reads as broken.
+  // Agent402's MPP index rejected us for exactly that on 2026-08-23.
+  if (url.pathname === "/.well-known/mpp.json") return json(discoveryDoc());
+  // Same document under the x402 discovery name, since crawlers look for one
+  // or the other and both describe the same priced surface.
+  if (url.pathname === "/.well-known/x402" || url.pathname === "/.well-known/x402.json") {
+    return json(discoveryDoc());
+  }
   // 402 Index domain-ownership proof. Public hash, instant listing approval.
   if (url.pathname === "/.well-known/402index-verify.txt") {
     return asset("7c8bf86a54822a288ab3ac9ad28d2319185dd1c2f7e03b4ad168f9ccc43cf032", "text/plain");
@@ -1280,9 +1291,16 @@ function discoveryDoc() {
       alternative: "prepaid credit key, Authorization: Bearer <key>",
     },
     mcp: { url: "https://mcp.signalnodus.ai/", transport: "streamable-http" },
-    // Derived from the live route table. A hand-maintained list here once
-    // hid 11 of 16 paid routes from everything that gates on this document.
-    routes: describeRoutes().map((r) => route(r.path, r.tool, r.params)),
+    // Derived from the live route table, priced routes FIRST. Index crawlers
+    // probe the first advertised route to confirm a seller actually charges,
+    // and lookup_company is free, so leading with it made us read as a
+    // non-paying endpoint. Agent402's MPP index rejected us for exactly that
+    // on 2026-08-23 ("no WWW-Authenticate: Payment challenge on the probed
+    // endpoint") even though every priced route challenges correctly.
+    routes: describeRoutes()
+      .slice()
+      .sort((a, b) => priceOf(b.tool) - priceOf(a.tool))
+      .map((r) => route(r.path, r.tool, r.params)),
     base_url: "https://api.signalnodus.ai",
     contact: "hgenix@agentmail.to",
   };
