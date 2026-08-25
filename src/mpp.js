@@ -28,7 +28,7 @@ import {
   toolFilingEvents,
   toolActivistStakes,
   toolIpoPipeline,
-  toolRiskChurnScore,
+  toolRewriteRatio,
   toolVerifyFinancialClaim,
   isInvalidParams,
 } from "./mcp.js";
@@ -37,7 +37,7 @@ import { toolCftcPositioning } from "./macrodata.js";
 import { toolEnergyData, toolCropData, toolTradeFlows } from "./keyeddata.js";
 import { toolGasOptimizer, toolTokenReport } from "./onchain.js";
 import { toolX402Audit } from "./x402audit.js";
-import { priceOf, dollars, UNITS_PER_DOLLAR, authorize, paymentRequired } from "./billing.js";
+import { priceOf, dollars, UNITS_PER_DOLLAR, authorize, paymentRequired, toolRank, recordServed, servedAccessions } from "./billing.js";
 import { PACKS, mintKey } from "./payments.js";
 import { toolEvmBalance, toolEvmGas, toolEvmReceipt, toolTokenPrice } from "./onchain.js";
 import { toolFxRate, toolDomainReport, toolPredictionMarkets } from "./market.js";
@@ -305,9 +305,14 @@ const BAZAAR_INFO = {
     q: { company: "Apple", limit: "5" },
     out: { totalFilings: 214, filings: [{ registrant: "Example Strategies LLC", client: "Apple Inc.", incomeUsd: 120000, issues: ["Taxation"], year: 2026 }] },
   },
+  "/v1/score/rewrite": {
+    q: { company: "NVDA", item: "1A" },
+    out: { rewritePercent: 4.8, magnitude: "boilerplate", sentencesAdded: 15, sentencesRemoved: 15, from: { accession: "..." }, to: { accession: "..." } },
+  },
+  // Old path for the same tool, kept so pre-rename callers still settle.
   "/v1/score/churn": {
     q: { company: "NVDA", item: "1A" },
-    out: { churnPercent: 4.8, verdict: "typical", sentencesAdded: 15, sentencesRemoved: 15, from: { accession: "..." }, to: { accession: "..." } },
+    out: { rewritePercent: 4.8, magnitude: "boilerplate", sentencesAdded: 15, sentencesRemoved: 15, from: { accession: "..." }, to: { accession: "..." } },
   },
   "/v1/verify/claim": {
     q: { company: "AAPL", concept: "Revenues", claimed_value: "391035000000", fiscal_year: "2024" },
@@ -449,7 +454,9 @@ const ROUTES = {
   "/v1/ipos": { tool: "ipo_pipeline", run: toolIpoPipeline },
   "/v1/gov/contracts": { tool: "government_contracts", run: toolGovernmentContracts },
   "/v1/gov/lobbying": { tool: "lobbying", run: toolLobbying },
-  "/v1/score/churn": { tool: "risk_churn_score", run: toolRiskChurnScore },
+  "/v1/score/rewrite": { tool: "rewrite_ratio", run: toolRewriteRatio },
+  // Pre-rename path; same tool, same price, kept for stale callers.
+  "/v1/score/churn": { tool: "rewrite_ratio", run: toolRewriteRatio, alias: true },
   "/v1/verify/claim": { tool: "verify_financial_claim", run: toolVerifyFinancialClaim },
   "/v1/x402/audit": { tool: "x402_audit", run: toolX402Audit },
   "/v1/token/report": { tool: "token_report", run: toolTokenReport },
@@ -465,7 +472,12 @@ export function isMppRoute(pathname) {
 }
 
 export function describeRoutes() {
-  return Object.entries(ROUTES).map(([path, r]) => ({
+  // Alias paths still answer but are not advertised, and core tools lead:
+  // the route list is a sales surface, not a router dump.
+  return Object.entries(ROUTES)
+    .filter(([, r]) => !r.alias)
+    .sort(([, a], [, b]) => toolRank(a.tool) - toolRank(b.tool))
+    .map(([path, r]) => ({
     path,
     tool: r.tool,
     price: dollars(priceOf(r.tool)),
@@ -622,6 +634,11 @@ export async function handleMppRoute(request, env, ctx, url) {
     try {
       const args = Object.fromEntries(url.searchParams.entries());
       const data = await route.run(args, ctx, env);
+      // Pin the usage row to the accession(s) served, for GET /v1/usage.
+      if (decision.usageId) {
+        const served = servedAccessions(data);
+        if (served) ctx?.waitUntil?.(recordServed(env?.BILLING, decision.usageId, served));
+      }
       return json({ ...data, _paid: dollars(price) });
     } catch (err) {
       console.error("keyed REST call failed", route.tool, err);

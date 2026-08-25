@@ -6,6 +6,12 @@
 // first real prospect described abandoning, and it is what the incumbents gate
 // behind a monthly subscription.
 
+// Version of the extraction + diff pipeline. Bumped whenever htmlToText,
+// extractItem, or diffSections changes behaviour, so a caller can tell
+// whether two answers came from the same parser. Travels in every
+// filing-derived payload next to the accession number.
+export const PARSER_VERSION = "2026-08-25.1";
+
 // 10-K items. Order matters: boundaries are found by locating the next item.
 const ITEMS_10K = [
   ["1", "Business"],
@@ -165,7 +171,7 @@ export function extractItem(text, form, itemId) {
   const idx = catalog.findIndex(([id]) => id === itemId);
   if (idx === -1) return null;
 
-  const starts = allMatches(text, itemHeadingRegex(itemId));
+  const starts = allMatches(text, itemHeadingRegex(itemId)).filter((s) => !isCrossReference(text, s));
   if (starts.length === 0) return null;
 
   // Candidate ends: any later item heading in the catalog.
@@ -193,6 +199,21 @@ export function extractItem(text, form, itemId) {
 
   const last = candidates[candidates.length - 1];
   return last.body.length >= MIN_SECTION ? last.body : null;
+}
+
+// A heading match immediately preceded by citation language or an opening
+// quote is a MENTION of the item, not the item: 'described under "Item 1A.
+// Risk Factors" in this Annual Report'. Treating such a mention as the
+// section start returned a forward-looking-statements paragraph as Item 1A
+// on a real amended 10-K. The markers are matched tightly (directly before
+// the heading) so a normal section heading, which follows the previous
+// section's final sentence, is never skipped.
+function isCrossReference(text, start) {
+  const before = text.slice(Math.max(0, start - 60), start).replace(/\s+/g, " ");
+  if (/["“(]\s*$/.test(before)) return true;
+  // '...set forth in "Part I — Item 1A...' cites the item through its part.
+  if (/part\s+[iv]+\s*[—–,:-]?\s*$/i.test(before)) return true;
+  return /(?:\bsee|\bunder|described in|refer(?:ence)? to|pursuant to|set forth in|contained in)\s*[("“'‘]?\s*$/i.test(before);
 }
 
 function allMatches(text, re) {

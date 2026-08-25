@@ -1,0 +1,53 @@
+{
+  "ran_at": "2026-08-25",
+  "parser_version": "2026-08-25.1",
+  "service_version": "1.6.0",
+  "section_boundary": {
+    "cases": 88,
+    "passed": 80,
+    "pass_rate": 0.9091,
+    "pass_rate_non_amended": 0.9079,
+    "pass_rate_amended": 0.9167,
+    "failures": [
+      {
+        "id": "jpm-0001628280-26-008131-7",
+        "reason": "extraction returned null"
+      },
+      {
+        "id": "jpm-0001628280-26-054343-2",
+        "reason": "item title not at the start of the section"
+      },
+      {
+        "id": "intc-0000050863-26-000011-1A",
+        "reason": "implausibly short (35 chars)"
+      },
+      {
+        "id": "intc-0000050863-26-000011-7",
+        "reason": "extraction returned null"
+      },
+      {
+        "id": "intc-0000050863-25-000009-1A",
+        "reason": "implausibly short (35 chars)"
+      },
+      {
+        "id": "intc-0000050863-26-000157-2",
+        "reason": "item title not at the start of the section"
+      },
+      {
+        "id": "ibm-0000051143-26-000010-7",
+        "reason": "extraction returned null"
+      },
+      {
+        "id": "wfcf-0001493152-22-009182-1A",
+        "reason": "expected no section for this filing, but text was returned"
+      }
+    ]
+  },
+  "diff": {
+    "trials": 45,
+    "precision": 1,
+    "recall": 1,
+    "reformat_false_positives": 0
+  },
+  "method": "See eval/README.md. Reproduce with `node eval/run.mjs`."
+}

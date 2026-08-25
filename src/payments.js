@@ -134,6 +134,11 @@ export async function createCheckout(request, env) {
       "line_items[0][price_data][product_data][description]":
         `${dollars(pack.units)} of API credit. No subscription, no expiry.`,
       "line_items[0][quantity]": "1",
+      // A real invoice PDF behind every card purchase, so anyone spending
+      // company money can expense it without emailing us.
+      "invoice_creation[enabled]": "true",
+      "invoice_creation[invoice_data][description]":
+        `Signal Nodus ${pack.label} credit pack: ${dollars(pack.units)} of per-call API credit.`,
       success_url: `https://signalnodus.ai/key?k=${apiKey}`,
       cancel_url: "https://signalnodus.ai/pricing",
       "metadata[key_hash]": keyHash,

@@ -19,8 +19,10 @@ CREATE TABLE IF NOT EXISTS usage (
   cost        INTEGER NOT NULL DEFAULT 0, -- tenths of a cent charged
   billable    INTEGER NOT NULL DEFAULT 0,
   day         TEXT NOT NULL,             -- YYYY-MM-DD, for free-tier windows
-  created_at  TEXT NOT NULL
+  created_at  TEXT NOT NULL,
+  detail      TEXT                       -- accession number(s) served, for the payer's audit log
 );
+-- Existing deployments: ALTER TABLE usage ADD COLUMN detail TEXT;
 
 CREATE INDEX IF NOT EXISTS usage_subject_day ON usage (subject, day);
 CREATE INDEX IF NOT EXISTS usage_created ON usage (created_at);

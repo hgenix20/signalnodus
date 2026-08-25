@@ -2,8 +2,8 @@
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "ai.signalnodus/sec-filings",
   "title": "Signal Nodus SEC Filings",
-  "description": "Year-over-year 10-K diffs, 8-K events, insider trades, 13F, IPOs, XBRL. Pay per call, key or x402.",
-  "version": "1.5.0",
+  "description": "Amendment-safe 10-K/10-Q section diffs, claim checks vs XBRL, 8-K events. Accuracy published. Per call.",
+  "version": "1.6.0",
   "websiteUrl": "https://signalnodus.ai",
   "repository": {
     "url": "https://github.com/hgenix20/signalnodus",

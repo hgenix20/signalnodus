@@ -55,7 +55,7 @@ export const PRICING = {
   ipo_pipeline: 10, // $0.01 - new S-1/F-1 registrations, market-wide
   government_contracts: 50, // $0.05 - USAspending federal awards
   lobbying: 50, // $0.05 - Senate LDA disclosures
-  risk_churn_score: 100, // $0.10 - decision oracle over the diff
+  rewrite_ratio: 100, // $0.10 - mechanical rewrite ratio over the diff
   verify_financial_claim: 100, // $0.10 - deterministic XBRL claim check
   x402_audit: 100, // $0.10 - inspect a public x402 endpoint, no payment signed
   token_report: 100, // $0.10 - one-call token due-diligence data
@@ -66,8 +66,63 @@ export const PRICING = {
   trade_flows: 50, // $0.05 - Census monthly trade by HS chapter
 };
 
+// Renamed tools keep answering under their old name so a caller with a stale
+// tool list is served, charged correctly, and metered under the current name.
+export const TOOL_ALIASES = {
+  // "risk_churn_score" implied a risk opinion. The number is a mechanical
+  // rewrite ratio and the name now says so.
+  risk_churn_score: "rewrite_ratio",
+};
+
+export function canonicalTool(tool) {
+  return TOOL_ALIASES[tool] || tool;
+}
+
+// The product. Everything else in PRICING is supporting surface: kept live,
+// listed after these, and marked experimental where it leaves the SEC path.
+export const CORE_TOOLS = [
+  "lookup_company",
+  "recent_filings",
+  "latest_filings",
+  "filing_section",
+  "compare_filings",
+  "verify_financial_claim",
+  "filing_events",
+];
+
+// Outside the core US-SEC path. Live and priced, but advertised as
+// experimental: they may change or be withdrawn, and they are not covered by
+// the published accuracy evaluation.
+export const EXPERIMENTAL_TOOLS = new Set([
+  "evm_balance",
+  "evm_gas",
+  "evm_receipt",
+  "token_price",
+  "token_report",
+  "gas_optimizer",
+  "fx_rate",
+  "domain_report",
+  "prediction_markets",
+  "x402_audit",
+  "government_contracts",
+  "lobbying",
+  "cftc_positioning",
+  "energy_data",
+  "crop_data",
+  "trade_flows",
+]);
+
+// Shared ordering for every advertised surface (tools/list, discovery docs,
+// pricing page): core tools in their stated order, then supporting SEC
+// tools, then experimental ones.
+export function toolRank(tool) {
+  const core = CORE_TOOLS.indexOf(tool);
+  if (core !== -1) return core;
+  return EXPERIMENTAL_TOOLS.has(tool) ? 2000 : 1000;
+}
+
 export function priceOf(tool) {
-  return PRICING[tool] ?? 0;
+  return PRICING[canonicalTool(tool)] ?? 0;
 }
 
 export function dollars(units) {
@@ -88,6 +143,7 @@ export async function hashKey(key) {
  * endpoint costs the customer.
  */
 export async function authorize(env, { tool, apiKey, ip }) {
+  tool = canonicalTool(tool);
   const cost = priceOf(tool);
   if (cost === 0) return { allowed: true, cost: 0, tier: "free-tool" };
 
@@ -127,16 +183,75 @@ async function chargeKey(db, apiKey, tool, cost) {
     return { allowed: false, reason: "insufficient_credits", cost, balance: row.credits };
   }
 
-  await logUsage(db, keyHash, tool, cost, 1);
-  return { allowed: true, cost, tier: "paid", balance: row.credits - cost };
+  const usageId = await logUsage(db, keyHash, tool, cost, 1);
+  return { allowed: true, cost, tier: "paid", balance: row.credits - cost, usageId };
 }
 
 async function logUsage(db, subject, tool, cost, billable) {
   const now = new Date().toISOString();
-  await db
+  const res = await db
     .prepare("INSERT INTO usage (subject, tool, cost, billable, day, created_at) VALUES (?, ?, ?, ?, ?, ?)")
     .bind(subject, tool, cost, billable, now.slice(0, 10), now)
     .run();
+  return res.meta?.last_row_id ?? null;
+}
+
+// After the work completes, pin the usage row to what was actually served:
+// the accession number(s) the response was built from. This is the audit
+// trail a payer reads back with GET /v1/usage, and it is what settles a
+// "you served me the wrong section" dispute with the exact document cited.
+export async function recordServed(db, usageId, detail) {
+  if (!db || !usageId || !detail) return;
+  try {
+    await db.prepare("UPDATE usage SET detail = ? WHERE id = ?").bind(String(detail).slice(0, 300), usageId).run();
+  } catch (err) {
+    console.error("usage detail not recorded", err);
+  }
+}
+
+// Pulls the accession numbers out of a tool result, whatever shape the tool
+// returns them in. Best effort: a result with no filings yields null.
+export function servedAccessions(structured) {
+  if (!structured || typeof structured !== "object") return null;
+  const accs = [];
+  const push = (v) => {
+    if (typeof v === "string" && /^\d{10}-\d{2}-\d{6}$/.test(v) && !accs.includes(v)) accs.push(v);
+  };
+  push(structured.filing?.accession);
+  push(structured.from?.accession);
+  push(structured.to?.accession);
+  push(structured.accessionNumber);
+  if (Array.isArray(structured.filings)) for (const f of structured.filings.slice(0, 5)) push(f?.accessionNumber || f?.accession);
+  if (Array.isArray(structured.events)) for (const e of structured.events.slice(0, 5)) push(e?.accessionNumber || e?.accession);
+  return accs.length ? accs.join(",") : null;
+}
+
+// A payer's own audit trail: the last 30 days of calls charged to this key,
+// with the accession(s) each response was built from where the tool serves
+// filing data. Free to read; reading your bill should never cost money.
+export async function usageLog(db, apiKey, { days = 30, limit = 500 } = {}) {
+  const keyHash = await hashKey(apiKey);
+  const key = await db.prepare("SELECT label, credits, active FROM api_keys WHERE key_hash = ?").bind(keyHash).first();
+  if (!key) return null;
+  const since = new Date(Date.now() - days * 86_400_000).toISOString();
+  const rows = await db
+    .prepare(
+      "SELECT tool, cost, detail, created_at FROM usage WHERE subject = ? AND billable = 1 AND created_at >= ? ORDER BY created_at DESC LIMIT ?",
+    )
+    .bind(keyHash, since, limit)
+    .all();
+  return {
+    label: key.label,
+    balance: dollars(key.credits),
+    active: Boolean(key.active),
+    window_days: days,
+    calls: (rows.results || []).map((r) => ({
+      tool: r.tool,
+      cost: dollars(r.cost),
+      accessions: r.detail || null,
+      at: r.created_at,
+    })),
+  };
 }
 
 // Same job as each MCP tool, reachable over plain HTTP where the 402 challenge
@@ -164,7 +279,7 @@ const PAYABLE_ROUTE = {
   ipo_pipeline: "/v1/ipos",
   government_contracts: "/v1/gov/contracts",
   lobbying: "/v1/gov/lobbying",
-  risk_churn_score: "/v1/score/churn",
+  rewrite_ratio: "/v1/score/rewrite",
   verify_financial_claim: "/v1/verify/claim",
   x402_audit: "/v1/x402/audit",
   token_report: "/v1/token/report",
@@ -196,13 +311,13 @@ export function paymentRequired(decision, tool) {
     return {
       ...base,
       reason:
-        "This call costs money and no payment credential was presented. Every data call is priced; there is no free tier and no subscription.",
+        "This call costs money and no payment credential was presented. Data calls are priced per call; lookup_company is free, and a free $5 trial key exists at https://signalnodus.ai/trial.",
       pay_with: {
         per_call_x402: PAYABLE_ROUTE[tool]
           ? `GET https://api.signalnodus.ai${PAYABLE_ROUTE[tool]} returns HTTP 402 with WWW-Authenticate: Payment and an x402 PAYMENT-REQUIRED header. Pay it and the same data comes back. No account, no signup.`
           : null,
-        buy_a_key_autonomously:
-          "GET https://api.signalnodus.ai/v1/credit?pack=starter also answers 402. Settle it and the response body contains a fresh API key. No human in the loop.",
+        buy_a_key:
+          "GET https://api.signalnodus.ai/v1/credit?pack=starter also answers 402. Settle it and the response body contains a fresh API key. No account or signup needed.",
         credit_key: "Or buy credit at https://signalnodus.ai/pricing and send Authorization: Bearer <key>",
         rails: "x402 on Base (USDC) and Stripe machine payments (stablecoin or card).",
       },

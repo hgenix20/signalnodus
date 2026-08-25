@@ -3,6 +3,13 @@ node_modules/
 .dev.vars
 package-lock.json
 
+# Eval working files: the cache is bulky EDGAR HTML, the candidate/review
+# pair is a human-in-the-loop staging area. Only golden.json and results.json
+# are the published record.
+eval/.cache/
+eval/golden.candidate.json
+eval/review.txt
+
 # Nothing key-shaped ever goes in, by accident or otherwise.
 *.pem
 *.key
