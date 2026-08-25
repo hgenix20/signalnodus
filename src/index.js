@@ -226,6 +226,7 @@ async function apexResponse(request, url, env, ctx) {
   }
   if (url.pathname === "/pricing") { logPageView(env, ctx, request, url); return html(pricingPage()); }
   if (url.pathname === "/status") { logPageView(env, ctx, request, url); return statusPage(env, ctx); }
+  if (url.pathname === "/vs") { logPageView(env, ctx, request, url); return html(vsPage()); }
   if (url.pathname === "/eval") { logPageView(env, ctx, request, url); return html(evalPage()); }
   if (url.pathname === "/eval.json") return json(EVAL_RESULTS);
   if (url.pathname === "/research") { logPageView(env, ctx, request, url); return html(researchIndex()); }
@@ -267,6 +268,7 @@ async function apexResponse(request, url, env, ctx) {
   <url><loc>https://signalnodus.ai/pricing</loc></url>
   <url><loc>https://signalnodus.ai/eval</loc></url>
   <url><loc>https://signalnodus.ai/status</loc></url>
+  <url><loc>https://signalnodus.ai/vs</loc></url>
   <url><loc>https://signalnodus.ai/trial</loc></url>
   <url><loc>https://signalnodus.ai/recipes</loc></url>
   <url><loc>https://signalnodus.ai/radar</loc></url>
@@ -1208,7 +1210,8 @@ function pricingPage() {
           Those are subscriptions: you pay the floor whether you run one job or
           a thousand. Here the same year-over-year diff is <strong>$0.50</strong>
           and the floor is zero. You would need about <strong>480 diffs a
-          month</strong> before this costs what the $239 tier costs.
+          month</strong> before this costs what the $239 tier costs. Full
+          comparison, including when self-hosting beats us: <a href="/vs">/vs</a>.
         </p>
       </section>
 
@@ -1238,6 +1241,51 @@ function pricingPage() {
     </main>`,
     { canonical: "https://signalnodus.ai/pricing" },
   );
+}
+
+// The comparison a buyer actually runs: what does my real workload cost, and
+// what happens when a filing gets amended. Honest about where each option
+// wins, including where the answer is "self-host".
+function vsPage() {
+  const inner = `
+<main class="wrap">
+  <section class="hero">
+    <h1>Signal Nodus vs the alternatives</h1>
+    <p class="lede">Priced on a real workload: 20 year-over-year section diffs
+    a year, with company lookups and section pulls around them. Not on tool
+    counts.</p>
+  </section>
+  <section>
+    <h2>Cost for 20 diffs a year</h2>
+    <table class="packs">
+      <tr><th></th><th>Signal Nodus</th><th>sec-api.io</th><th>Self-hosted EDGAR parser</th></tr>
+      <tr><td>20 diffs + 100 section pulls / year</td><td><strong>$15</strong> (20 &times; $0.50 + 100 &times; $0.05)</td><td><strong>$2,868/yr</strong> ($239/mo Business tier; section extraction is not in the $55 entry tier &mdash; their pricing page, checked 2026-08-15)</td><td><strong>$0 cash</strong> + your engineering time</td></tr>
+      <tr><td>Idle months</td><td>$0</td><td>$239/mo regardless</td><td>$0</td></tr>
+      <tr><td>Amendment safety</td><td>Accession pinning on every call; unpinned responses warn when a later amendment exists</td><td>Their own tooling; check their docs</td><td>Yours to build and test</td></tr>
+      <tr><td>Measured accuracy</td><td><a href="/eval">Published golden-set eval</a>, failures listed, reproducible harness</td><td>Not published, to our knowledge</td><td>Yours to build; our <a href="https://github.com/hgenix20/signalnodus/tree/main/eval">eval harness is open</a> and works on any parser</td></tr>
+      <tr><td>Setup</td><td>One MCP URL or one curl</td><td>Account + subscription</td><td>Parser + cache + rate limiting + monitoring</td></tr>
+    </table>
+  </section>
+  <section class="mt">
+    <h2>When not to use us</h2>
+    <p class="sub">EDGAR is free and several open-source EDGAR MCP servers
+    exist. If you run thousands of diffs a month, self-hosting is cheaper than
+    anyone's API and you should do it; take our
+    <a href="https://github.com/hgenix20/signalnodus">parser and eval set</a>
+    with you, they are MIT. What you are paying for here, per call and with no
+    floor, is the measured error rate, the amendment handling, and not running
+    the infrastructure.</p>
+  </section>
+  <section class="mt">
+    <h2>Try the diff</h2>
+    <pre class="block">curl "https://api.signalnodus.ai/v1/compare?company=NVDA&amp;item=1A" \\
+  -H "authorization: Bearer &lt;key&gt;"   <span class="dim"># free $5 key at /trial</span></pre>
+  </section>
+</main>`;
+  return pageShell("Compare · Signal Nodus", inner, {
+    canonical: "https://signalnodus.ai/vs",
+    description: "Signal Nodus vs sec-api.io vs self-hosting an EDGAR parser, priced on 20 diffs a year, with amendment safety and published accuracy compared honestly.",
+  });
 }
 
 // ------------------------------------------------------------ status + eval
@@ -1919,6 +1967,70 @@ function openApiDoc(env) {
 // authority to someone else's page.
 
 const RESEARCH = {
+  "diff-an-amended-10k": {
+    title: "Walkthrough: diffing a messy amended 10-K without getting burned",
+    date: "2026-08-25",
+    summary:
+      "A real 10-K with two amendments, three parser traps it springs, and the pinned commands that survive them. Includes the trap that caught our own parser.",
+    body: `
+<p>DUET Acquisition Corp. (CIK 1890671), a SPAC, filed its 10-K for fiscal 2021
+on 2022-03-30 (accession <span class="mono">0001493152-22-008123</span>). Item
+1A is five sentences: as a smaller reporting company it was "not required to
+provide the information required by this Item." Nine months later it filed two
+amendments, <span class="mono">0001493152-22-036834</span> (2022-12-30) and
+<span class="mono">0001493152-23-001096</span> (2023-01-10), which add real
+risk-factor disclosure. This one filing chain springs three separate parser
+traps.</p>
+
+<h2>Trap 1: the cross-reference that looks like a heading</h2>
+<p>The amendment's forward-looking-statements paragraph contains this text:</p>
+<pre class="block">...including the factors set forth in &ldquo;Part I &mdash;
+Item 1A. Risk Factors&rdquo; in this Annual Report.</pre>
+<p>After HTML rendering, <span class="mono">Item 1A. Risk Factors</span> lands
+at the start of a line. A parser that extracts "from the Item 1A heading"
+matches it and returns the forward-looking-statements boilerplate as the risk
+factors, with no error. <strong>Our parser did exactly this until version
+2026-08-25.1.</strong> The golden-set eval caught it (the case is
+<span class="mono">0001890671-0001493152-22-036834-1A</span> in
+<a href="https://github.com/hgenix20/signalnodus/tree/main/eval">eval/</a>),
+and the fix skips heading matches preceded by citation context. The correct
+extraction is 4,743 characters starting at the real heading.</p>
+
+<h2>Trap 2: the amendment that moves your baseline</h2>
+<p>Diff "the two most recent annual filings" naively in January 2023 and the
+amendments silently become one side of your comparison. Against the original
+10-K, the 2022-12-30 amendment's Item 1A shows <strong>18 sentences added, 1
+removed, 4 unchanged: an 81.8% change ratio</strong>. That is real disclosure
+change worth knowing about, but only if you know an amendment is what you are
+reading. Every unpinned response here says exactly which accession it used and
+warns when a later amendment exists; it never switches documents between
+runs.</p>
+
+<h2>Trap 3: the amendment that changes nothing</h2>
+<p>Diffing the two amendments against each other: <strong>0 added, 0 removed,
+22 unchanged</strong>. The 2023-01-10 refiling did not touch Item 1A. A
+pipeline that re-baselines on every new filing would have re-processed and
+re-alerted on a no-op. (The inverse trap also exists: some 10-K/As are
+exhibit-only and contain no Item 1A at all, and the correct answer there is
+"not found", never whatever text happens to sit near the words. That case is
+in the golden set too.)</p>
+
+<h2>Reproduce it</h2>
+<pre class="block"># the original: five sentences of "not required"
+curl "https://api.signalnodus.ai/v1/section?company=1890671&amp;form=10-K&amp;item=1A&amp;accession=0001493152-22-008123" \\
+  -H "authorization: Bearer &lt;key&gt;"
+
+# the amendment: the real risk factors, pinned so it can never drift
+curl "https://api.signalnodus.ai/v1/section?company=1890671&amp;form=10-K/A&amp;item=1A&amp;accession=0001493152-22-036834" \\
+  -H "authorization: Bearer &lt;key&gt;"
+
+# diff the two amendments: 0 added, 0 removed
+curl "https://api.signalnodus.ai/v1/compare?company=1890671&amp;form=10-K/A&amp;item=1A&amp;from_accession=0001493152-22-036834&amp;to_accession=0001493152-23-001096" \\
+  -H "authorization: Bearer &lt;key&gt;"</pre>
+<p>A free $5 key is at <a href="/trial">/trial</a>. Every response carries the
+accession, filing date, source URL, and parser version it was computed from,
+so any of these numbers can be checked against the SEC's own documents.</p>`,
+  },
   "nvidia-risk-factor-churn-2021-2026": {
     title: "NVIDIA's risk factors: six years of churn, and the 2022 break",
     date: "2026-08-18",
