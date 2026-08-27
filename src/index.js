@@ -227,6 +227,7 @@ async function apexResponse(request, url, env, ctx) {
   if (url.pathname === "/pricing") { logPageView(env, ctx, request, url); return html(pricingPage()); }
   if (url.pathname === "/status") { logPageView(env, ctx, request, url); return statusPage(env, ctx); }
   if (url.pathname === "/vs") { logPageView(env, ctx, request, url); return html(vsPage()); }
+  if (url.pathname === "/compliance") { logPageView(env, ctx, request, url); return html(compliancePage()); }
   if (url.pathname === "/eval") { logPageView(env, ctx, request, url); return html(evalPage()); }
   if (url.pathname === "/eval.json") return json(EVAL_RESULTS);
   if (url.pathname === "/research") { logPageView(env, ctx, request, url); return html(researchIndex()); }
@@ -269,6 +270,7 @@ async function apexResponse(request, url, env, ctx) {
   <url><loc>https://signalnodus.ai/eval</loc></url>
   <url><loc>https://signalnodus.ai/status</loc></url>
   <url><loc>https://signalnodus.ai/vs</loc></url>
+  <url><loc>https://signalnodus.ai/compliance</loc></url>
   <url><loc>https://signalnodus.ai/trial</loc></url>
   <url><loc>https://signalnodus.ai/recipes</loc></url>
   <url><loc>https://signalnodus.ai/radar</loc></url>
@@ -800,7 +802,7 @@ ${beacon}
 <body>
 <header class="site"><div class="wrap"><span class="mark">SIGNAL<span class="dot">·</span>NODUS</span></div></header>
 ${inner}
-<footer><div class="wrap">Signal Nodus · human-owned · <a href="/status">status</a> · <a href="/eval">accuracy</a> · <a href="https://github.com/hgenix20/signalnodus">source on GitHub</a></div></footer>
+<footer><div class="wrap">Signal Nodus · human-owned · <a href="/status">status</a> · <a href="/eval">accuracy</a> · <a href="/compliance">for compliance teams</a> · <a href="https://github.com/hgenix20/signalnodus">source on GitHub</a></div></footer>
 <script src="/site.js" defer></script>
 ${turnstile ? '<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>' : ""}
 </body>
@@ -1246,6 +1248,94 @@ function pricingPage() {
 // The comparison a buyer actually runs: what does my real workload cost, and
 // what happens when a filing gets amended. Honest about where each option
 // wins, including where the answer is "self-host".
+function compliancePage() {
+  const inner = `
+<main class="wrap">
+  <section class="hero">
+    <h1>Know what changed in a filing. Prove you reviewed it.</h1>
+    <p class="lede">
+      For compliance officers at SEC-registered investment advisers and
+      small-cap issuers: sentence-level diffs of 10-K and 10-Q sections
+      against the exact version you last reviewed, with a receipt for every
+      check. Free EDGAR alerts tell you a filing exists. This tells you what
+      moved inside it, and leaves a record that you looked.
+    </p>
+  </section>
+
+  <section class="mt">
+    <h2>The three failures this exists to prevent</h2>
+    <p class="sub"><strong>"I missed a change."</strong> A registrant you rely
+    on files, language shifts in a risk factor or MD&amp;A, and the next
+    manual review is weeks away. A sentence-level diff shows exactly what was
+    added, removed, and reworded, the day the filing lands.</p>
+    <p class="sub"><strong>"An amendment broke my baseline."</strong> Every
+    comparison here is pinned to accession numbers. An amended filing (10-K/A)
+    never replaces the version you reviewed without your knowledge, because
+    the version you reviewed is named in the receipt. This is the failure
+    most tools have no answer for.</p>
+    <p class="sub"><strong>"I can't prove I reviewed it."</strong> Every check
+    writes a receipt: what was compared, when, against which versions, with
+    what result. Your firm's audit log is yours to read at any time. When an
+    examiner asks how filing review is evidenced, the evidence already
+    exists.</p>
+  </section>
+
+  <section class="mt">
+    <h2>What this is not</h2>
+    <p class="sub">
+      Not legal or compliance advice, not filing preparation, not a compliance
+      program, and no judgment calls about materiality. Signal Nodus reports
+      what changed; deciding what it means stays with you. Primary records
+      only: no news, no forecasts, no analyst opinion.
+    </p>
+  </section>
+
+  <section class="mt">
+    <h2>Measured, not promised</h2>
+    <p class="sub">
+      Accuracy is published, misses included: section extraction runs at
+      90.9% on a public 88-case golden set, and the diff engine measures 100%
+      sentence precision and recall with zero false-positive reformats on
+      perturbation trials. Read the <a href="/eval">full eval</a>, check
+      <a href="/status">service health</a>, or inspect the
+      <a href="https://github.com/hgenix20/signalnodus">source on GitHub</a>.
+      Every number on this page is reproducible on request, and any diff we
+      show you can be verified against EDGAR's own copy for free.
+    </p>
+  </section>
+
+  <section class="mt">
+    <h2>Pilot program</h2>
+    <p class="sub">
+      This is a new offering built on a working tool layer, and we are honest
+      about that: we are recruiting a small number of pilot firms rather than
+      selling a finished subscription. A pilot includes your registrant list
+      watched against each new filing, diffs with receipts delivered to your
+      inbox, hands-on setup, direct access to the operator, and pilot pricing
+      agreed together. You can verify everything on this page before a single
+      conversation.
+    </p>
+    <p class="sub">
+      Prefer to test it yourself first? A <a href="/trial">free $5 test key</a>
+      runs the same diffs with no card and no signup.
+    </p>
+  </section>
+
+  <section class="mt">
+    <h2>Talk to us about a pilot</h2>
+    <p class="sub">Clear the checkpoint and the address appears.</p>
+    <div id="cf-widget" class="mt"></div>
+    <p id="contact-result" class="mt"></p>
+  </section>
+</main>`;
+  return pageShell("Signal Nodus for compliance teams", inner, {
+    canonical: "https://signalnodus.ai/compliance",
+    turnstile: true,
+    description:
+      "Amendment-safe SEC filing diff monitoring with audit-evidence receipts, for compliance officers at RIAs and small-cap issuers. Accuracy published, pilots open.",
+  });
+}
+
 function vsPage() {
   const inner = `
 <main class="wrap">
