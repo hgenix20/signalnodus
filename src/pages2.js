@@ -26,8 +26,8 @@ const CONTROLS = `<ul class="controls">
 </ul>`;
 
 function globeStage(withList) {
-  return `<div class="globe-stage"><canvas id="globe" role="img" aria-label="A globe with a dot at every place the sentinels watch; drag to turn it"></canvas></div>
-<div class="legend"><span class="live">live</span><span class="building">building</span><span class="planned">planned</span><span>dot: a watched place · larger: more sentinels · ring: where a feed lives</span></div>
+  return `<div class="globe-stage"><canvas id="globe" role="img" aria-label="A globe with a dot at every place the sentinels watch. Drag or use the arrow keys to turn it; space pauses the spin."></canvas></div>
+<div class="globe-controls"><button type="button" id="globe-pause" aria-pressed="false" aria-controls="globe">Pause</button><span class="legend"><span class="live">live</span><span class="building">building</span><span class="planned">planned</span></span></div>
 ${withList ? '<ul id="sentinel-list" aria-label="Sentinels"></ul>' : ""}`;
 }
 
@@ -36,16 +36,27 @@ export function homePage2() {
 <main>
   <section class="hero" id="world" tabindex="-1"><div class="wrap">
     <div class="thesis">
-      <span class="eyebrow">the watch · 71 cities · 15 sentinels · growing</span>
+      <span class="eyebrow">Evidence for AI agent deployments</span>
       <h1>When an AI agent acts on your behalf, can you prove why it was allowed to?</h1>
       <p class="dim" style="max-width:48ch">Signal Nodus reconstructs the record of an agent deployment after an incident, a board question, or an examiner's request, and watches the world for the next one.</p>
-      <p><a class="cta" href="/review">The incident evidence review</a></p>
+      <p style="display:flex;gap:10px;flex-wrap:wrap"><a class="cta" href="/review">The incident evidence review</a><a class="cta ghost" href="/watch">See the Watch</a></p>
+      <div class="stats" aria-label="The Watch today"><div class="stat"><b>71</b><span>cities watched</span></div><div class="stat"><b>15</b><span>sentinels</span></div><div class="stat"><b>5</b><span>being built</span></div></div>
     </div>
     <div>${globeStage(false)}</div>
   </div></section>
 
+  <section class="chapter" id="proof" tabindex="-1"><div class="wrap">
+    <div class="stack"><span class="eyebrow">Proof</span><h2>We run the record on ourselves before we run it for you.</h2><p class="dim">No logos and no invented case studies. What we can show is the discipline itself, applied daily to the system that does the work.</p></div>
+    <div class="proof">
+      <div class="item"><h3>Expectations before actions</h3><p class="dim">Every uncertain action is preceded by a written expectation and followed by the outcome. Misses stay on the record.</p></div>
+      <div class="item"><h3>A human at every door</h3><p class="dim">Nothing is sent, published, bought or deployed without a named person's yes, and the yes is logged.</p></div>
+      <div class="item"><h3>Evidence over self-report</h3><p class="dim">The system's own "it worked" is never accepted; a device, a log line or a person confirms it.</p></div>
+      <div class="item"><h3>Demotion, never deletion</h3><p class="dim">Old material moves to a colder shelf so anyone can go back and check the work.</p></div>
+    </div>
+  </div></section>
+
   <section class="chapter" id="question" tabindex="-1"><div class="wrap">
-    <div class="stack"><span class="eyebrow">01 · the question</span><h2>Three questions every agent deployment now gets asked.</h2></div>
+    <div class="stack"><span class="eyebrow">The question</span><h2>Three questions every agent deployment now gets asked.</h2></div>
     <div class="stack-l">
       <div class="stack"><h3>"What did it expect to happen?"</h3><p class="dim">An agent that acts without a stated expectation cannot be audited, only blamed. The review recovers the expectation for every action it can, and names the ones where none existed.</p></div>
       <div class="stack"><h3>"Who allowed it?"</h3><p class="dim">A policy, a named person, or nothing. The record shows which, action by action, with the hand-off where a human decided.</p></div>
@@ -55,22 +66,22 @@ export function homePage2() {
   </div></section>
 
   <section class="chapter" id="record" tabindex="-1"><div class="wrap">
-    <div class="stack"><span class="eyebrow">02 · the record</span><h2>The incident evidence review.</h2><p class="dim">Two to three weeks, one agent deployment. You provide the logs and two interviews. You get the record, its gaps, and a one-page summary written for the people who asked.</p><p><a class="cta" href="/review">How the review runs</a></p></div>
+    <div class="stack"><span class="eyebrow">The record</span><h2>The incident evidence review.</h2><p class="dim">Two to three weeks, one agent deployment. You provide the logs and two interviews. You get the record, its gaps, and a one-page summary written for the people who asked.</p><p><a class="cta" href="/review">How the review runs</a></p></div>
     <div class="stack-l">${RECORD}<p class="dim">Every finding cites the log line it came from. Nothing in the pack is an opinion without a source. Regulators now ask for automatic, tamper-evident logs and for humans who can override and interrupt an agent; insurers and boards ask the same thing in plainer words. The pack is that record, in the shape those requests take.</p></div>
   </div></section>
 
   <section class="chapter" id="watch" tabindex="-1"><div class="wrap">
-    <div class="stack"><span class="eyebrow">03 · the watch</span><h2>Sentinels that notice incidents from the record, not the news.</h2><p class="dim">Filings, breach notices, vendor disclosures, advisories naming the frameworks agents run on, and tripwires of our own that only an automated agent would follow. The globe above shows where they are looking; as more are built, more of the world is watched.</p><p><a class="cta" href="/watch">Every sentinel, mapped</a></p></div>
+    <div class="stack"><span class="eyebrow">The watch</span><h2>Sentinels that notice incidents from the record, not the news.</h2><p class="dim">Filings, breach notices, vendor disclosures, advisories naming the frameworks agents run on, and tripwires of our own that only an automated agent would follow. The globe above shows where they are looking; as more are built, more of the world is watched.</p><p><a class="cta" href="/watch">Every sentinel, mapped</a></p></div>
     <div class="stack-l">${WATCH_BLOCK}<p class="dim">Every signal is a claim until it is verified. Public sources and our own assets only; nothing here probes anyone else's systems.</p></div>
   </div></section>
 
   <section class="chapter" id="trust" tabindex="-1"><div class="wrap">
-    <div class="stack"><span class="eyebrow">04 · trust</span><h2>Your data never reaches the operator's reasoning system.</h2><p class="dim">A review takes your agent's logs, which are proprietary. The design assumes nothing about trust and proves its own claim: raw data stays in a vault, the models only ever see tokens, and every byte that leaves is logged and handed back to you.</p><p><a class="cta" href="/trust">The eight controls</a></p></div>
+    <div class="stack"><span class="eyebrow">Trust</span><h2>Your data never reaches the operator's reasoning system.</h2><p class="dim">A review takes your agent's logs, which are proprietary. The design assumes nothing about trust and proves its own claim: raw data stays in a vault, the models only ever see tokens, and every byte that leaves is logged and handed back to you.</p><p><a class="cta" href="/trust">The eight controls</a></p></div>
     <div class="stack-l"><p class="dim">A human owns and runs this service; an AI system does the reconstruction under that owner's control and kill switch, on the same record-keeping it applies to itself. Write to <a href="mailto:hgenix@agentmail.to">hgenix@agentmail.to</a> with the deployment in one paragraph; a human reads it and replies.</p></div>
   </div></section>
 </main>
 <script src="/globe.js" defer></script>`;
-  return shell2("Signal Nodus", inner, { current: "/", rail: [["world", "The world"], ["question", "The question"], ["record", "The record"], ["watch", "The watch"], ["trust", "Trust"]],
+  return shell2("Signal Nodus", inner, { current: "/", rail: [["world", "The world"], ["proof", "Proof"], ["question", "The question"], ["record", "The record"], ["watch", "The watch"], ["trust", "Trust"]],
     description: "Evidence of why an AI agent was allowed to act: expectation, authority, outcome, and every miss, reconstructed after an incident, and sentinels that watch the world for the next one." });
 }
 
@@ -92,7 +103,7 @@ export function reviewPage2() {
 export function watchPage2() {
   const inner = `<main>
   <section class="hero" id="world" tabindex="-1"><div class="wrap">
-    <div class="thesis"><span class="eyebrow">the watch · where the sentinels are looking</span><h1>The Watch.</h1><p class="dim" style="max-width:44ch">Drag the world to turn it. It spins on its own when you let go.</p></div>
+    <div class="thesis"><span class="eyebrow">Where the sentinels are looking</span><h1>The Watch.</h1><p class="dim" style="max-width:44ch">Drag the world to turn it, or use the arrow keys. It spins on its own when you let go; Pause stops it.</p><div class="stats" aria-label="The Watch today"><div class="stat"><b>71</b><span>cities</span></div><div class="stat"><b>15</b><span>sentinels</span></div><div class="stat"><b>5</b><span>being built</span></div></div></div>
     <div>${globeStage(false)}</div>
   </div></section>
   <section class="chapter" id="sentinels" tabindex="-1"><div class="wrap">

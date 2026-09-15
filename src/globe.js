@@ -60,8 +60,15 @@ export const GLOBE_JS = String.raw`
   function up() { dragging = false; last = null; idleAt = performance.now(); }
   canvas.addEventListener("mousedown", down); addEventListener("mousemove", move); addEventListener("mouseup", up);
   canvas.addEventListener("touchstart", down, { passive: false }); canvas.addEventListener("touchmove", move, { passive: false }); canvas.addEventListener("touchend", up);
-  canvas.addEventListener("mouseleave", () => { hover = null; });
-  canvas.style.cursor = "grab"; canvas.style.touchAction = "pan-y";
+    canvas.style.cursor = "grab"; canvas.style.touchAction = "pan-y";
+  // Auto-rotating content needs a user control: a pause/play button, and the spin stops while the
+  // canvas is hovered or focused, and under reduced motion.
+  const btn = document.getElementById("globe-pause");
+  function setSpin(on) { spin = on && !reduced; if (btn) { btn.setAttribute("aria-pressed", String(!spin)); btn.textContent = spin ? "Pause" : "Play"; } }
+  if (btn) { btn.addEventListener("click", () => setSpin(!spin)); setSpin(!reduced); }
+  canvas.tabIndex = 0; canvas.addEventListener("focus", () => { idleAt = performance.now() + 1e9; }); canvas.addEventListener("blur", () => { idleAt = performance.now(); });
+  canvas.addEventListener("mouseenter", () => { idleAt = performance.now() + 1e9; }); canvas.addEventListener("mouseleave", () => { hover = null; idleAt = performance.now(); });
+  canvas.addEventListener("keydown", e => { const step = 8; if (e.key === "ArrowLeft") { rot -= step; e.preventDefault(); } if (e.key === "ArrowRight") { rot += step; e.preventDefault(); } if (e.key === "ArrowUp") { tilt = Math.min(60, tilt + 5); e.preventDefault(); } if (e.key === "ArrowDown") { tilt = Math.max(-60, tilt - 5); e.preventDefault(); } if (e.key === " ") { setSpin(!spin); e.preventDefault(); } });
   function render(data) { sentinels = data.sentinels || []; if (!list) return; list.innerHTML = "";
     for (const s of sentinels) { const li = document.createElement("li"); li.className = "sentinel " + s.status; li.tabIndex = 0;
       li.innerHTML = '<span class="dot"></span><span class="name"></span> <span class="dim"></span>';
