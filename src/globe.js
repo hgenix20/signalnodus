@@ -3,10 +3,10 @@
 // faint ring. It spins on its own, follows a drag or a swipe, and resumes its spin after a pause.
 // No library: the site's content-security-policy is default-src 'self'. Served as /globe.js.
 export const GLOBE_JS = String.raw`
-(function () {
-  const canvas = document.getElementById("globe"); if (!canvas) return;
+function mountGlobe(canvas) {
   const ctx = canvas.getContext("2d");
-  const list = document.getElementById("sentinel-list");
+  const scope = canvas.closest("section, main, body") || document;
+  const list = scope.querySelector("[data-sentinel-list]") || document.getElementById("sentinel-list");
   const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
   const COL = { sea: "#0b0e14", land: "#1a2130", line: "#2a3346", grid: "#151b27", live: "#4fd1a5", building: "#7aa2f7", planned: "#8a93a6", text: "#d7dce6", dim: "#8a93a6" };
   let sentinels = [], coast = null, rot = -40, tilt = 16, dpr = Math.min(2, devicePixelRatio || 1);
@@ -63,8 +63,8 @@ export const GLOBE_JS = String.raw`
     canvas.style.cursor = "grab"; canvas.style.touchAction = "pan-y";
   // Auto-rotating content needs a user control: a pause/play button, and the spin stops while the
   // canvas is hovered or focused, and under reduced motion.
-  const btn = document.getElementById("globe-pause");
-  function setSpin(on) { spin = on && !reduced; if (btn) { btn.setAttribute("aria-pressed", String(!spin)); btn.textContent = spin ? "Pause" : "Play"; } }
+  const btn = scope.querySelector("[data-globe-pause]");
+  function setSpin(on) { spin = on && !reduced; idleAt = spin ? performance.now() - IDLE_MS : performance.now(); if (btn) { btn.setAttribute("aria-pressed", String(!spin)); btn.textContent = spin ? "Pause" : "Play"; } }
   if (btn) { btn.addEventListener("click", () => setSpin(!spin)); setSpin(!reduced); }
   canvas.tabIndex = 0; canvas.addEventListener("focus", () => { idleAt = performance.now() + 1e9; }); canvas.addEventListener("blur", () => { idleAt = performance.now(); });
   canvas.addEventListener("mouseenter", () => { idleAt = performance.now() + 1e9; }); canvas.addEventListener("mouseleave", () => { hover = null; idleAt = performance.now(); });
@@ -79,5 +79,6 @@ export const GLOBE_JS = String.raw`
   fetch("/watch/sentinels.json").then(r => r.json()).then(render).catch(() => {});
   fetch("/watch/coast.json").then(r => r.json()).then(c => { coast = c; }).catch(() => {});
   size(); addEventListener("resize", () => { size(); draw(); }); requestAnimationFrame(tick);
-})();
+}
+document.querySelectorAll("canvas[data-globe]").forEach(mountGlobe);
 `;

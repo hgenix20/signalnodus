@@ -26,9 +26,9 @@ const CONTROLS = `<ul class="controls">
 </ul>`;
 
 function globeStage(withList) {
-  return `<div class="globe-stage"><canvas id="globe" role="img" aria-label="A globe with a dot at every place the sentinels watch. Drag or use the arrow keys to turn it; space pauses the spin."></canvas></div>
-<div class="globe-controls"><button type="button" id="globe-pause" aria-pressed="false" aria-controls="globe">Pause</button><span class="legend"><span class="live">live</span><span class="building">building</span><span class="planned">planned</span></span></div>
-${withList ? '<ul id="sentinel-list" aria-label="Sentinels"></ul>' : ""}`;
+  return `<div class="globe-stage"><canvas data-globe role="img" aria-label="A globe with a dot at every place the sentinels watch. Drag or use the arrow keys to turn it; space pauses the spin."></canvas></div>
+<div class="globe-controls"><button type="button" data-globe-pause aria-pressed="false">Pause</button><span class="legend"><span class="live">live</span><span class="building">building</span><span class="planned">planned</span></span></div>
+${withList ? '<ul data-sentinel-list aria-label="Sentinels"></ul>' : ""}`;
 }
 
 export function homePage2() {
@@ -39,7 +39,7 @@ export function homePage2() {
       <span class="eyebrow">Evidence for AI agent deployments</span>
       <h1>When an AI agent acts on your behalf, can you prove why it was allowed to?</h1>
       <p class="dim" style="max-width:48ch">Signal Nodus reconstructs the record of an agent deployment after an incident, a board question, or an examiner's request, and watches the world for the next one.</p>
-      <p style="display:flex;gap:10px;flex-wrap:wrap"><a class="cta" href="/review">The incident evidence review</a><a class="cta ghost" href="/watch">See the Watch</a></p>
+      <p style="display:flex;gap:10px;flex-wrap:wrap"><a class="cta" href="mailto:hgenix@agentmail.to?subject=Incident%20evidence%20review">Request a review</a><a class="cta ghost" href="/review">How it works</a></p>
       <div class="stats" aria-label="The Watch today"><div class="stat"><b>71</b><span>cities watched</span></div><div class="stat"><b>15</b><span>sentinels</span></div><div class="stat"><b>5</b><span>being built</span></div></div>
     </div>
     <div>${globeStage(false)}</div>
@@ -66,18 +66,18 @@ export function homePage2() {
   </div></section>
 
   <section class="chapter" id="record" tabindex="-1"><div class="wrap">
-    <div class="stack"><span class="eyebrow">The record</span><h2>The incident evidence review.</h2><p class="dim">Two to three weeks, one agent deployment. You provide the logs and two interviews. You get the record, its gaps, and a one-page summary written for the people who asked.</p><p><a class="cta" href="/review">How the review runs</a></p></div>
+    <div class="stack"><span class="eyebrow">The record</span><h2>The incident evidence review.</h2><p class="dim">Two to three weeks, one agent deployment. You provide the logs and two interviews. You get the record, its gaps, and a one-page summary written for the people who asked.</p><p><a class="cta ghost" href="/review">How the review works</a></p></div>
     <div class="stack-l">${RECORD}<p class="dim">Every finding cites the log line it came from. Nothing in the pack is an opinion without a source. Regulators now ask for automatic, tamper-evident logs and for humans who can override and interrupt an agent; insurers and boards ask the same thing in plainer words. The pack is that record, in the shape those requests take.</p></div>
   </div></section>
 
   <section class="chapter" id="watch" tabindex="-1"><div class="wrap">
-    <div class="stack"><span class="eyebrow">The watch</span><h2>Sentinels that notice incidents from the record, not the news.</h2><p class="dim">Filings, breach notices, vendor disclosures, advisories naming the frameworks agents run on, and tripwires of our own that only an automated agent would follow. The globe above shows where they are looking; as more are built, more of the world is watched.</p><p><a class="cta" href="/watch">Every sentinel, mapped</a></p></div>
+    <div class="stack"><span class="eyebrow">The watch</span><h2>Sentinels that notice incidents from the record, not the news.</h2><p class="dim">Filings, breach notices, vendor disclosures, advisories naming the frameworks agents run on, and tripwires of our own that only an automated agent would follow. The globe above shows where they are looking; as more are built, more of the world is watched.</p><p><a class="cta ghost" href="/watch">Every sentinel, mapped</a></p></div>
     <div class="stack-l">${WATCH_BLOCK}<p class="dim">Every signal is a claim until it is verified. Public sources and our own assets only; nothing here probes anyone else's systems.</p></div>
   </div></section>
 
   <section class="chapter" id="trust" tabindex="-1"><div class="wrap">
-    <div class="stack"><span class="eyebrow">Trust</span><h2>Your data never reaches the operator's reasoning system.</h2><p class="dim">A review takes your agent's logs, which are proprietary. The design assumes nothing about trust and proves its own claim: raw data stays in a vault, the models only ever see tokens, and every byte that leaves is logged and handed back to you.</p><p><a class="cta" href="/trust">The eight controls</a></p></div>
-    <div class="stack-l"><p class="dim">A human owns and runs this service; an AI system does the reconstruction under that owner's control and kill switch, on the same record-keeping it applies to itself. Write to <a href="mailto:hgenix@agentmail.to">hgenix@agentmail.to</a> with the deployment in one paragraph; a human reads it and replies.</p></div>
+    <div class="stack"><span class="eyebrow">Trust</span><h2>Your data never reaches the operator's reasoning system.</h2><p class="dim">A review takes your agent's logs, which are proprietary. The design assumes nothing about trust and proves its own claim: raw data stays in a vault, the models only ever see tokens, and every byte that leaves is logged and handed back to you.</p><p><a class="cta ghost" href="/trust">The eight controls</a></p></div>
+    <div class="stack-l"><p class="dim">A human owns and runs this service; an AI system does the reconstruction under that owner's control and kill switch, on the same record-keeping it applies to itself.</p><p style="margin-top:14px"><a class="cta" href="mailto:hgenix@agentmail.to?subject=Incident%20evidence%20review">Request a review</a></p></div>
   </div></section>
 </main>
 <script src="/globe.js" defer></script>`;
@@ -94,7 +94,7 @@ export function reviewPage2() {
       <div class="stack"><h3>Week two</h3><p class="dim">Reconstruction. Code rebuilds the timeline and the action record from the logs; judgment is applied only where the record is ambiguous, and every such call is marked as one.</p></div>
       <div class="stack"><h3>Week three</h3><p class="dim">Second interview to check the reconstruction against what people remember. Delivery. A walk-through with whoever has to present it.</p></div>
       <div class="stack"><h3>What this is not</h3><p class="dim">Not legal advice, not a security assessment, not a guardrail product, and no judgment about materiality: the review reports what the record shows and where it is silent. The decisions stay with your counsel and your board.</p></div>
-      <div class="stack"><h3>After the review</h3><p class="dim">Most teams find the record should have been written continuously. The same record-keeping can run beside your agents from then on, so the next question has an answer before it is asked. Ask about it at the walk-through.</p><p><a class="cta" href="mailto:hgenix@agentmail.to">Start with one paragraph</a></p></div>
+      <div class="stack"><h3>After the review</h3><p class="dim">Most teams find the record should have been written continuously. The same record-keeping can run beside your agents from then on, so the next question has an answer before it is asked. Ask about it at the walk-through.</p><p><a class="cta" href="mailto:hgenix@agentmail.to?subject=Incident%20evidence%20review">Request a review</a></p><p class="dim" style="font-size:14px">Email a few lines about the deployment and what was asked of it. A person replies within one business day.</p></div>
     </div>
   </div></section></main>`;
   return shell2("The incident evidence review · Signal Nodus", inner, { current: "/review", canonical: "https://signalnodus.ai/review", description: "A two-to-three-week reconstruction of an AI agent deployment's record after an incident: timeline, action record, gaps, oversight map, and a one-page board summary." });
@@ -108,7 +108,7 @@ export function watchPage2() {
   </div></section>
   <section class="chapter" id="sentinels" tabindex="-1"><div class="wrap">
     <div class="stack"><span class="eyebrow">every sentinel, at the places it covers</span><h2>Drag the world to turn it. It spins on its own when you let go.</h2><p class="dim">Sentinels notice when an AI agent incident becomes public, from the record rather than the news. The map shows the markets, jurisdictions and user populations each one covers. As more sentinels are built, more of the world is watched.</p>${WATCH_BLOCK}</div>
-    <div class="stack-l"><ul id="sentinel-list" aria-label="Sentinels"></ul><p class="dim">First, for us: it is how we know who to call, and when. Second, on request, an alert feed for insurers, counsel, and compliance teams who need to know which firms in their book just had an agent incident, from primary sources, before the story runs. Public sources and our own assets only.</p></div>
+    <div class="stack-l"><ul data-sentinel-list aria-label="Sentinels"></ul><p class="dim">First, for us: it is how we know who to call, and when. Second, on request, an alert feed for insurers, counsel, and compliance teams who need to know which firms in their book just had an agent incident, from primary sources, before the story runs. Public sources and our own assets only.</p></div>
   </div></section></main>
 <script src="/globe.js" defer></script>`;
   return shell2("The Watch · Signal Nodus", inner, { current: "/watch", canonical: "https://signalnodus.ai/watch", description: "Sentinels over filings, breach notices, vendor disclosures, advisories, and canary tripwires, mapped at the places they cover." });

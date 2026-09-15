@@ -12,10 +12,11 @@ a { color: var(--text); text-decoration: underline; text-decoration-color: var(-
 header.site { position: sticky; top: 0; z-index: 10; background: color-mix(in srgb, var(--ground) 90%, transparent); backdrop-filter: blur(10px); border-bottom: 1px solid var(--line); margin-inline: -16px; padding-inline: 16px; }
 header.site .wrap { display: flex; align-items: center; justify-content: space-between; height: 60px; gap: 16px; }
 .mark { font: 400 20px var(--mono); letter-spacing: .14em; color: var(--text); text-decoration: none; padding: 8px 0; } .mark .dot { color: var(--signal); }
-nav.top { display: flex; gap: 6px; } nav.top a { font: 500 13px var(--body); color: var(--dim); text-decoration: none; padding: 10px 12px; min-height: 44px; display: inline-flex; align-items: center; border-radius: 4px; } nav.top a[aria-current="page"] { color: var(--text); background: var(--muted); } nav.top a:hover { color: var(--text); }
-@media (max-width: 560px) { nav.top a { padding: 10px 8px; font-size: 12px; } }
+nav.top { display: flex; gap: 6px; } nav.top a { font: 500 14px var(--body); color: var(--dim); text-decoration: none; padding: 10px 12px; min-height: 44px; display: inline-flex; align-items: center; border-radius: 4px; } nav.top a[aria-current="page"] { color: var(--text); background: var(--muted); } nav.top a:hover { color: var(--text); }
+.menu-btn { display: none; font: 500 14px var(--body); color: var(--text); background: transparent; border: 1px solid var(--line); border-radius: 4px; padding: 0 14px; min-height: 44px; cursor: pointer; }
+@media (max-width: 720px) { .menu-btn { display: inline-flex; align-items: center; gap: 8px; } nav.top { display: none; position: absolute; left: 0; right: 0; top: 60px; flex-direction: column; gap: 0; background: var(--panel); border-bottom: 1px solid var(--line); padding: 8px 16px 12px; box-shadow: 0 12px 30px rgba(15,23,42,.08); } nav.top[data-open="true"] { display: flex; } nav.top a { min-height: 48px; font-size: 16px; padding: 10px 8px; border-radius: 4px; } }
 .eyebrow { font: 400 12px var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--dim); }
-h1, h2 { font: 400 clamp(36px, 5.6vw, 80px)/1.02 var(--display); font-style: italic; letter-spacing: -.01em; margin: 0; text-wrap: balance; max-width: 18ch; }
+h1, h2 { font: 400 clamp(32px, 5.6vw, 80px)/1.04 var(--display); font-style: italic; letter-spacing: -.01em; margin: 0; text-wrap: balance; max-width: 18ch; }
 h2 { font-size: clamp(28px, 3.6vw, 48px); } h3 { font: 500 21px/1.3 var(--body); margin: 0; }
 p { max-width: 62ch; margin: 0; } .lede { font-size: 22px; line-height: 1.45; color: var(--text); } .dim { color: var(--dim); }
 .stack { display: grid; gap: 18px; } .stack-l { display: grid; gap: 28px; }
@@ -57,11 +58,12 @@ export function shell2(title, inner, opts = {}) {
 <link rel="canonical" href="${canonical}">${index ? "" : '<meta name="robots" content="noindex, nofollow">'}
 <meta name="description" content="${description}">
 <meta property="og:title" content="${title}"><meta property="og:description" content="${description}"><meta property="og:type" content="website"><meta property="og:site_name" content="Signal Nodus"><meta property="og:url" content="${canonical}">
+<script type="application/ld+json">${JSON.stringify({ "@context": "https://schema.org", "@type": "Organization", name: "Signal Nodus", url: "https://signalnodus.ai/", email: "hgenix@agentmail.to", description })}</script>
 <link rel="stylesheet" href="/fonts.css">
 <style>${SHELL_CSS}</style>
 </head>
 <body>
-<header class="site"><div class="wrap"><a class="mark" href="/">SIGNAL<span class="dot">·</span>NODUS</a><nav class="top" aria-label="Site">${nav}</nav></div></header>
+<header class="site"><div class="wrap"><a class="mark" href="/">SIGNAL<span class="dot">·</span>NODUS</a><button type="button" class="menu-btn" aria-expanded="false" aria-controls="site-nav">Menu</button><nav class="top" id="site-nav" aria-label="Site">${nav}</nav></div></header>
 ${railHtml}
 ${inner}
 <footer><div class="wrap">Signal Nodus · human-owned · <a href="/review">review</a> · <a href="/watch">the watch</a> · <a href="/trust">trust</a> · <a href="/status">status</a></div></footer>
@@ -71,6 +73,8 @@ ${inner}
 }
 export const SITE2_JS = String.raw`
 (function () {
+  const mb = document.querySelector(".menu-btn"), nav = document.getElementById("site-nav");
+  if (mb && nav) { mb.addEventListener("click", () => { const open = nav.getAttribute("data-open") === "true"; nav.setAttribute("data-open", String(!open)); mb.setAttribute("aria-expanded", String(!open)); mb.textContent = open ? "Menu" : "Close"; }); nav.addEventListener("click", e => { if (e.target.closest("a")) { nav.setAttribute("data-open", "false"); mb.setAttribute("aria-expanded", "false"); mb.textContent = "Menu"; } }); addEventListener("keydown", e => { if (e.key === "Escape" && nav.getAttribute("data-open") === "true") { nav.setAttribute("data-open", "false"); mb.setAttribute("aria-expanded", "false"); mb.textContent = "Menu"; mb.focus(); } }); }
   const rail = document.querySelector(".rail"); if (!rail) return;
   const links = [...rail.querySelectorAll("a")]; const ids = links.map(a => a.dataset.chapter);
   const secs = ids.map(id => document.getElementById(id)).filter(Boolean);
