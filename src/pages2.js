@@ -34,14 +34,15 @@ ${withList ? '<ul id="sentinel-list" aria-label="Sentinels"></ul>' : ""}`;
 export function homePage2() {
   const inner = `
 <main>
-  <section class="hero" id="world" tabindex="-1">
-    ${globeStage(false)}
-    <div class="thesis"><div class="wrap">
+  <section class="hero" id="world" tabindex="-1"><div class="wrap">
+    <div class="thesis">
       <span class="eyebrow">the watch · 71 cities · 15 sentinels · growing</span>
       <h1>When an AI agent acts on your behalf, can you prove why it was allowed to?</h1>
-      <p class="dim" style="max-width:52ch">Signal Nodus reconstructs the record of an agent deployment after an incident, a board question, or an examiner's request, and watches the world for the next one.</p>
-    </div></div>
-  </section>
+      <p class="dim" style="max-width:48ch">Signal Nodus reconstructs the record of an agent deployment after an incident, a board question, or an examiner's request, and watches the world for the next one.</p>
+      <p><a class="cta" href="/review">The incident evidence review</a></p>
+    </div>
+    <div>${globeStage(false)}</div>
+  </div></section>
 
   <section class="chapter" id="question" tabindex="-1"><div class="wrap">
     <div class="stack"><span class="eyebrow">01 · the question</span><h2>Three questions every agent deployment now gets asked.</h2></div>
@@ -90,9 +91,10 @@ export function reviewPage2() {
 
 export function watchPage2() {
   const inner = `<main>
-  <section class="hero" id="world" tabindex="-1">${globeStage(false)}
-    <div class="thesis"><div class="wrap"><span class="eyebrow">the watch · where the sentinels are looking</span><h1>The Watch.</h1></div></div>
-  </section>
+  <section class="hero" id="world" tabindex="-1"><div class="wrap">
+    <div class="thesis"><span class="eyebrow">the watch · where the sentinels are looking</span><h1>The Watch.</h1><p class="dim" style="max-width:44ch">Drag the world to turn it. It spins on its own when you let go.</p></div>
+    <div>${globeStage(false)}</div>
+  </div></section>
   <section class="chapter" id="sentinels" tabindex="-1"><div class="wrap">
     <div class="stack"><span class="eyebrow">every sentinel, at the places it covers</span><h2>Drag the world to turn it. It spins on its own when you let go.</h2><p class="dim">Sentinels notice when an AI agent incident becomes public, from the record rather than the news. The map shows the markets, jurisdictions and user populations each one covers. As more sentinels are built, more of the world is watched.</p>${WATCH_BLOCK}</div>
     <div class="stack-l"><ul id="sentinel-list" aria-label="Sentinels"></ul><p class="dim">First, for us: it is how we know who to call, and when. Second, on request, an alert feed for insurers, counsel, and compliance teams who need to know which firms in their book just had an agent incident, from primary sources, before the story runs. Public sources and our own assets only.</p></div>

@@ -52,14 +52,16 @@ export const GLOBE_JS = String.raw`
     draw(); requestAnimationFrame(tick);
   }
   function pointerPos(e) { const b = canvas.getBoundingClientRect(); const t = e.touches ? e.touches[0] : e; return { x: t.clientX - b.left, y: t.clientY - b.top }; }
-  function down(e) { dragging = true; last = pointerPos(e); vel = 0; idleAt = performance.now(); if (e.cancelable) e.preventDefault(); }
-  function move(e) { const p = pointerPos(e); if (dragging && last) { const dx = p.x - last.x, dy = p.y - last.y; rot += dx * 0.35; vel = dx * 0.35; tilt = Math.max(-60, Math.min(60, tilt - dy * 0.25)); last = p; idleAt = performance.now(); if (e.cancelable) e.preventDefault(); return; }
+  function down(e) { dragging = true; last = pointerPos(e); vel = 0; idleAt = performance.now(); if (!e.touches && e.cancelable) e.preventDefault(); }
+  function move(e) { const p = pointerPos(e); if (dragging && last) { const dx = p.x - last.x, dy = p.y - last.y;
+    if (e.touches && Math.abs(dy) > Math.abs(dx) * 1.2) { last = p; return; } // a vertical thumb is a page scroll, not a spin
+    rot += dx * 0.35; vel = dx * 0.35; if (!e.touches) tilt = Math.max(-60, Math.min(60, tilt + dy * 0.25)); last = p; idleAt = performance.now(); if (!e.touches && e.cancelable) e.preventDefault(); return; }
     const hit = (canvas._pts || []).find(q => Math.hypot(q.x - p.x, q.y - p.y) < 10); hover = hit ? hit.e.place : null; canvas.style.cursor = hit ? "pointer" : "grab"; }
   function up() { dragging = false; last = null; idleAt = performance.now(); }
   canvas.addEventListener("mousedown", down); addEventListener("mousemove", move); addEventListener("mouseup", up);
   canvas.addEventListener("touchstart", down, { passive: false }); canvas.addEventListener("touchmove", move, { passive: false }); canvas.addEventListener("touchend", up);
   canvas.addEventListener("mouseleave", () => { hover = null; });
-  canvas.style.cursor = "grab"; canvas.style.touchAction = "none";
+  canvas.style.cursor = "grab"; canvas.style.touchAction = "pan-y";
   function render(data) { sentinels = data.sentinels || []; if (!list) return; list.innerHTML = "";
     for (const s of sentinels) { const li = document.createElement("li"); li.className = "sentinel " + s.status; li.tabIndex = 0;
       li.innerHTML = '<span class="dot"></span><span class="name"></span> <span class="dim"></span>';
