@@ -331,3 +331,32 @@ export function paymentRequired(decision, tool) {
   }
   return { ...base, reason: "Payment required." };
 }
+
+// Privacy retention, as stated at https://signalnodus.ai/privacy: rows that
+// identify a caller by network address (payment challenges, refused and
+// settled machine payments, page views) lose the address and user agent
+// after 90 days. The rows survive as counts, so per-tool demand history is
+// unaffected. Runs from the daily cron next to pruneAbandonedCheckouts.
+export async function anonymizeIdentifiedRows(env, days = 90) {
+  const db = env?.BILLING;
+  if (!db) return { changed: 0, skipped: "no database" };
+  const cutoff = new Date(Date.now() - days * 86_400_000).toISOString();
+  try {
+    const res = await db
+      .prepare(
+        `UPDATE usage
+         SET subject = CASE WHEN subject LIKE 'page:%' THEN 'page:expired' ELSE 'challenge:expired' END
+         WHERE (subject LIKE 'challenge:%' OR subject LIKE 'page:%')
+           AND subject NOT LIKE '%:expired'
+           AND created_at < ?`,
+      )
+      .bind(cutoff)
+      .run();
+    const changed = res.meta?.changes ?? 0;
+    if (changed) console.log(`anonymized ${changed} identified usage rows older than ${cutoff}`);
+    return { changed, cutoff };
+  } catch (err) {
+    console.error("anonymize failed", err);
+    return { changed: 0, error: String(err?.message || err) };
+  }
+}

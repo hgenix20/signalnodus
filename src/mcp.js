@@ -110,7 +110,13 @@ const JSON_RPC = {
 
 // ---------------------------------------------------------------- HTTP layer
 
-export async function handleMcp(request, env, ctx) {
+// opts.keyed selects the keyed endpoint (/keyed): the same tools, but an
+// unpaid call to a priced tool answers HTTP 401 with an OAuth challenge
+// instead of a tool-level payment error, so Claude's hosted clients open the
+// connect flow (src/oauth.js) and retry with the user's key as the bearer.
+// Machine-payment wording (x402, MPP) is left out of that surface entirely.
+export async function handleMcp(request, env, ctx, opts = {}) {
+  const keyed = Boolean(opts.keyed);
   const origin = request.headers.get("origin");
   if (origin && !isAllowedOrigin(origin)) {
     return new Response("forbidden origin", { status: 403, headers: SECURITY_HEADERS });
@@ -143,7 +149,9 @@ export async function handleMcp(request, env, ctx) {
   // The endpoint is unauthenticated and a cache miss becomes one request
   // against SEC, who rate limit at 10 req/s and block by User-Agent. Without a
   // per-caller cap, one script could get the whole service blocked upstream.
-  if (!(await withinRateLimit(request, env))) {
+  // A presented key is metered by credit, so the per-address cap only applies
+  // to anonymous traffic. Unknown keys are refused before any upstream work.
+  if (!extractApiKey(request) && !(await withinRateLimit(request, env))) {
     return rpcErrorResponse(null, JSON_RPC.INVALID_REQUEST, "rate limit exceeded, slow down", cors, 429);
   }
 
@@ -189,10 +197,19 @@ export async function handleMcp(request, env, ctx) {
     return rpcErrorResponse(id, JSON_RPC.INVALID_REQUEST, "missing method", cors, 400);
   }
 
+  // Lazy-auth gate, at the HTTP layer: a priced tool called with no key on the
+  // keyed endpoint must fail the request with 401, never a 200 tool error,
+  // or the client shows the text instead of a Connect card.
+  if (keyed && method === "tools/call" && !extractApiKey(request)) {
+    const tool = canonicalTool(msg.params?.name);
+    if (typeof tool === "string" && priceOf(tool) > 0) return authRequired(cors);
+  }
+
   try {
-    const result = await dispatch(method, msg.params ?? {}, env, ctx, request);
+    const result = await dispatch(method, msg.params ?? {}, env, ctx, request, keyed);
     return jsonRpc({ jsonrpc: "2.0", id, result }, cors);
   } catch (err) {
+    if (err instanceof AuthRequired) return authRequired(cors);
     if (err instanceof RpcError) {
       return jsonRpc({ jsonrpc: "2.0", id, error: { code: err.code, message: err.message } }, cors);
     }
@@ -237,6 +254,31 @@ class RpcError extends Error {
     super(message);
     this.code = code;
   }
+}
+
+// Thrown on the keyed endpoint when the presented key cannot be used at all
+// (unknown or disabled), so the transport answers 401 and the client
+// re-runs the connect flow rather than retrying a dead credential.
+class AuthRequired extends Error {}
+
+const KEYED_PRM = "https://mcp.signalnodus.ai/.well-known/oauth-protected-resource/keyed";
+
+function authRequired(cors) {
+  const challenge =
+    'Bearer error="invalid_token", error_description="Connect your Signal Nodus key", ' +
+    `resource_metadata="${KEYED_PRM}", scope="tools"`;
+  return new Response(
+    JSON.stringify({ error: "invalid_token", error_description: "Connect your Signal Nodus key to call this tool" }),
+    {
+      status: 401,
+      headers: {
+        ...cors,
+        "www-authenticate": challenge,
+        "content-type": "application/json; charset=utf-8",
+        "cache-control": "no-store",
+      },
+    },
+  );
 }
 
 // The REST rail needs to tell a caller's mistake apart from ours. An invalid
@@ -328,10 +370,10 @@ function rpcErrorResponse(id, code, message, cors, status) {
 
 // ------------------------------------------------------------ MCP dispatch
 
-async function dispatch(method, params, env, ctx, request) {
+async function dispatch(method, params, env, ctx, request, keyed = false) {
   switch (method) {
     case "initialize":
-      return initialize(params);
+      return initialize(params, keyed);
     case "ping":
       return {};
     case "tools/list":
@@ -354,20 +396,33 @@ async function dispatch(method, params, env, ctx, request) {
               description +=
                 price === 0
                   ? " Free: no key and no payment needed. Use it to verify the service before paying."
-                  : ` Costs ${dollars(price)} per call. No subscription: present a credit key or a machine payment.`;
+                  : keyed
+                    ? ` Costs ${dollars(price)} per call, charged to the connected key. No subscription.`
+                    : ` Costs ${dollars(price)} per call. No subscription: present a credit key or a machine payment.`;
             }
             return { ...t, description };
           }),
       };
     case "tools/call":
-      return callTool(params, env, ctx, request);
+      return callTool(params, env, ctx, request, keyed);
     default:
       throw new RpcError(JSON_RPC.METHOD_NOT_FOUND, `unknown method: ${method}`);
   }
 }
 
-function initialize(params) {
+function initialize(params, keyed = false) {
   const requested = params?.protocolVersion;
+  const paying = keyed
+    ? "Paying: lookup_company is free. The rest cost $0.01 to $0.50 per call, stated in " +
+      "each tool's description, and are charged to the prepaid key connected to this " +
+      "session. Free $5 test key: https://signalnodus.ai/trial. Credit packs: " +
+      "https://signalnodus.ai/pricing. No subscription."
+    : "Paying: lookup_company is free. The rest cost $0.01 to $0.50 per call, stated in " +
+      "each tool's description. Pay with a prepaid key (free $5 trial at " +
+      "https://signalnodus.ai/trial, packs at https://signalnodus.ai/pricing), or settle " +
+      "per call: the same tools at https://api.signalnodus.ai/v1/* answer HTTP 402 with " +
+      "x402 on Base (USDC) and Stripe machine payments. GET /v1/credit?pack=starter buys " +
+      "a reusable API key the same way, no account or signup.";
   const protocolVersion =
     typeof requested === "string" && SUPPORTED_PROTOCOLS.has(requested) ? requested : LATEST_PROTOCOL;
 
@@ -392,12 +447,7 @@ function initialize(params) {
       "accessionNumber and filingDate when reporting a number.\n\n" +
       "Coverage is US SEC filings only: no prices, no news, no non-US-listed companies, " +
       "and no forecasts.\n\n" +
-      "Paying: lookup_company is free. The rest cost $0.01 to $0.50 per call, stated in " +
-      "each tool's description. Pay with a prepaid key (free $5 trial at " +
-      "https://signalnodus.ai/trial, packs at https://signalnodus.ai/pricing), or settle " +
-      "per call: the same tools at https://api.signalnodus.ai/v1/* answer HTTP 402 with " +
-      "x402 on Base (USDC) and Stripe machine payments. GET /v1/credit?pack=starter buys " +
-      "a reusable API key the same way, no account or signup.",
+      paying,
   };
 }
 
@@ -1015,7 +1065,7 @@ const TOOLS = [
   },
 ];
 
-async function callTool(params, env, ctx, request) {
+async function callTool(params, env, ctx, request, keyed = false) {
   const name = params?.name;
   const args = params?.arguments ?? {};
 
@@ -1038,6 +1088,13 @@ async function callTool(params, env, ctx, request) {
     ip: request?.headers?.get("cf-connecting-ip"),
   });
   if (!decision.allowed) {
+    if (keyed) {
+      // A dead credential is a transport problem (reconnect); an empty one is
+      // a tool result the model can relay in plain words.
+      if (decision.reason === "unknown_key" || decision.reason === "key_disabled") throw new AuthRequired();
+      const refused = keyedRefusal(decision, name);
+      return { content: [{ type: "text", text: refused.message }], structuredContent: refused, isError: true };
+    }
     return {
       content: [{ type: "text", text: JSON.stringify(paymentRequired(decision, name), null, 2) }],
       structuredContent: paymentRequired(decision, name),
@@ -1068,6 +1125,18 @@ async function callTool(params, env, ctx, request) {
     console.error("tool failure", name, err);
     return toolError("upstream request failed");
   }
+}
+
+// Out-of-credit wording for the keyed endpoint: what to do, in one sentence,
+// with no payment-rail vocabulary that a hosted client's user cannot act on.
+function keyedRefusal(decision, tool) {
+  const price = dollars(priceOf(tool));
+  const balance = dollars(decision.balance || 0);
+  const message =
+    decision.reason === "insufficient_credits"
+      ? `Not enough credit on the connected key: ${tool} costs ${price} and the balance is ${balance}. Add credit at https://signalnodus.ai/pricing (card, about a minute; credit never expires) and retry.`
+      : `${tool} costs ${price} and could not be charged to the connected key. Check the balance at https://signalnodus.ai/api/balance or add credit at https://signalnodus.ai/pricing.`;
+  return { error: "insufficient_credits", tool, price, balance, add_credit: "https://signalnodus.ai/pricing", message };
 }
 
 async function runTool(name, args, env, ctx) {
