@@ -12,7 +12,7 @@ function mountGlobe(canvas) {
   let sentinels = [], coast = null, rot = -40, tilt = 16, dpr = Math.min(2, devicePixelRatio || 1);
   let hover = null, focus = null, dragging = false, last = null, idleAt = 0, spin = !reduced, vel = 0;
   const IDLE_MS = 3000, SPIN = 0.06;
-  function size() { const w = canvas.clientWidth, h = canvas.clientHeight; canvas.width = w * dpr; canvas.height = h * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0); }
+  function size() { const r = canvas.getBoundingClientRect(); const w = Math.max(1, Math.round(r.width)), h = Math.max(1, Math.round(r.height)); if (canvas.width !== w * dpr || canvas.height !== h * dpr) { canvas.width = w * dpr; canvas.height = h * dpr; } ctx.setTransform(dpr, 0, 0, dpr, 0, 0); return w > 2 && h > 2; }
   const rad = d => d * Math.PI / 180;
   function project(lat, lon, R, cx, cy) {
     const la = rad(lat), lo = rad(lon + rot), t = rad(tilt);
@@ -22,7 +22,8 @@ function mountGlobe(canvas) {
   }
   function pathLatLon(pts, R, cx, cy) { let started = false, any = false; for (const [lat, lon] of pts) { const p = project(lat, lon, R, cx, cy); if (!p.front) { started = false; continue; } any = true; if (!started) { ctx.moveTo(p.x, p.y); started = true; } else ctx.lineTo(p.x, p.y); } return any; }
   function draw() {
-    const w = canvas.clientWidth, h = canvas.clientHeight, cx = w / 2, cy = h / 2, R = Math.min(w, h) * 0.44;
+    const w = canvas.width / dpr, h = canvas.height / dpr, cx = w / 2, cy = h / 2, R = Math.min(w, h) * 0.44;
+    if (w < 3 || h < 3) return;
     ctx.clearRect(0, 0, w, h);
     ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.fillStyle = COL.sea; ctx.fill(); ctx.strokeStyle = COL.line; ctx.lineWidth = 1; ctx.stroke();
     ctx.strokeStyle = COL.grid; ctx.lineWidth = 0.6;
@@ -78,7 +79,9 @@ function mountGlobe(canvas) {
       list.appendChild(li); } }
   fetch("/watch/sentinels.json").then(r => r.json()).then(render).catch(() => {});
   fetch("/watch/coast.json").then(r => r.json()).then(c => { coast = c; }).catch(() => {});
-  size(); addEventListener("resize", () => { size(); draw(); }); requestAnimationFrame(tick);
+  size(); addEventListener("resize", () => { size(); draw(); });
+  if (typeof ResizeObserver !== "undefined") new ResizeObserver(() => { size(); draw(); }).observe(canvas);
+  requestAnimationFrame(tick);
 }
 document.querySelectorAll("canvas[data-globe]").forEach(mountGlobe);
 `;
