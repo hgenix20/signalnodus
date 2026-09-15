@@ -268,27 +268,12 @@ async function apexResponse(request, url, env, ctx) {
     return asset(MCP_REGISTRY_PROOF, "text/plain");
   }
   if (url.pathname === "/sitemap.xml") {
-    return asset(
-      `<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url><loc>https://signalnodus.ai/</loc></url>
-  <url><loc>https://signalnodus.ai/pricing</loc></url>
-  <url><loc>https://signalnodus.ai/eval</loc></url>
-  <url><loc>https://signalnodus.ai/status</loc></url>
-  <url><loc>https://signalnodus.ai/vs</loc></url>
-  <url><loc>https://signalnodus.ai/compliance</loc></url>
-  <url><loc>https://signalnodus.ai/trial</loc></url>
-  <url><loc>https://signalnodus.ai/recipes</loc></url>
-  <url><loc>https://signalnodus.ai/radar</loc></url>
-  <url><loc>https://signalnodus.ai/research</loc></url>
-${Object.keys(RESEARCH).map((k) => `  <url><loc>https://signalnodus.ai/research/${k}</loc></url>`).join("\n")}
-</urlset>
-`,
-      "application/xml",
-    );
+    const today = new Date().toISOString().slice(0, 10);
+    const urls = ["/", "/review", "/watch", "/trust", "/status"].map((u) => `  <url><loc>https://signalnodus.ai${u}</loc><lastmod>${today}</lastmod></url>`).join("\n");
+    return asset(`<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`, "application/xml");
   }
   if (url.pathname === "/robots.txt") {
-    return asset("User-agent: *\nAllow: /\nSitemap: https://signalnodus.ai/\n", "text/plain");
+    return asset("User-agent: *\nAllow: /\nDisallow: /key\nDisallow: /dashboard\nDisallow: /legacy\nSitemap: https://signalnodus.ai/sitemap.xml\n", "text/plain");
   }
   if (url.pathname === "/") { logPageView(env, ctx, request, url); return html(homePage2()); }
   if (url.pathname === "/review") { logPageView(env, ctx, request, url); return html(reviewPage2()); }
