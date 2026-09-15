@@ -137,14 +137,15 @@ export function watchPage(pageShell) {
       Sentinels that notice when an AI agent incident becomes public, from the record rather than
       the news: material-incident filings, breach notices, vendor disclosures, advisories that name
       the frameworks agents run on, and tripwires of our own that only an automated agent would
-      follow. Every sentinel is on this map, at the place its source lives. As more are built, more
-      appear.
+      follow. The map shows where the sentinels are looking: the markets, jurisdictions and user
+      populations each one covers. Drag the world to turn it; it spins on its own when you let go.
+      As more sentinels are built, more of the world is watched.
     </p>
   </section>
 
   <section class="globe-wrap" aria-label="Where the sentinels watch">
-    <canvas id="globe" role="img" aria-label="A globe with a point at each sentinel's source"></canvas>
-    <div class="legend"><span class="live">live</span><span class="building">building</span><span class="planned">planned</span><span class="dim">hover a point or a row for its name</span></div>
+    <canvas id="globe" role="img" aria-label="A globe with a dot at every place the sentinels watch"></canvas>
+    <div class="legend"><span class="live">live</span><span class="building">building</span><span class="planned">planned</span><span class="dim">a dot is a watched place; larger means more sentinels watch it; a faint ring is where a feed lives. Hover a dot, or a row to light its coverage.</span></div>
     <ul id="sentinel-list"></ul>
   </section>
 
