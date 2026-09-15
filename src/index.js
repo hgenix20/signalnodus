@@ -1,3 +1,4 @@
+import { homePage, reviewPage, watchPage, trustPage } from "./pages.js";
 import { handleMcp, toolLatestFilings } from "./mcp.js";
 import { createCheckout, handleWebhook, keyBalance, packSummary, pruneAbandonedCheckouts, mintKey } from "./payments.js";
 import { PRICING, priceOf, dollars, hashKey, usageLog, CORE_TOOLS, EXPERIMENTAL_TOOLS, toolRank } from "./billing.js";
@@ -284,7 +285,11 @@ ${Object.keys(RESEARCH).map((k) => `  <url><loc>https://signalnodus.ai/research/
   if (url.pathname === "/robots.txt") {
     return asset("User-agent: *\nAllow: /\nSitemap: https://signalnodus.ai/\n", "text/plain");
   }
-  if (url.pathname === "/") { logPageView(env, ctx, request, url); return html(landingPage(env)); }
+  if (url.pathname === "/") { logPageView(env, ctx, request, url); return html(homePage(pageShell)); }
+  if (url.pathname === "/review") { logPageView(env, ctx, request, url); return html(reviewPage(pageShell)); }
+  if (url.pathname === "/watch") { logPageView(env, ctx, request, url); return html(watchPage(pageShell)); }
+  if (url.pathname === "/trust") { logPageView(env, ctx, request, url); return html(trustPage(pageShell)); }
+  if (url.pathname === "/legacy") { logPageView(env, ctx, request, url); return html(landingPage(env)); }
 
   // Everything else is genuinely absent; saying so beats serving the landing
   // page under a wrong URL with a 200.
@@ -802,7 +807,7 @@ ${beacon}
 <body>
 <header class="site"><div class="wrap"><span class="mark">SIGNAL<span class="dot">·</span>NODUS</span></div></header>
 ${inner}
-<footer><div class="wrap">Signal Nodus · human-owned · <a href="/status">status</a> · <a href="/eval">accuracy</a> · <a href="/compliance">for compliance teams</a> · <a href="https://github.com/hgenix20/signalnodus">source on GitHub</a></div></footer>
+<footer><div class="wrap">Signal Nodus · human-owned · <a href="/review">review</a> · <a href="/watch">the watch</a> · <a href="/trust">trust</a> · <a href="/status">status</a> · <a href="https://github.com/hgenix20/signalnodus">source on GitHub</a></div></footer>
 <script src="/site.js" defer></script>
 ${turnstile ? '<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>' : ""}
 </body>
