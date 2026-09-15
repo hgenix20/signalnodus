@@ -1,6 +1,8 @@
 // The Watch globe: an orthographic Earth on a canvas from a small coastline set. It shows the places
 // the sentinels watch (each sentinel's coverage), not where their feeds are hosted; the source is a
-// faint ring. It spins on its own, follows a drag or a swipe, and resumes its spin after a pause.
+// faint ring. It turns on its own, stops the moment someone touches it, and turns again five seconds
+// after they let go. Land is drawn as outline only: a filled ring that crosses the horizon closes with a
+// chord across the disc, which is the shading that bled through while it spun.
 // No library: the site's content-security-policy is default-src 'self'. Served as /globe.js.
 export const GLOBE_JS = String.raw`
 function mountGlobe(canvas) {
@@ -8,10 +10,10 @@ function mountGlobe(canvas) {
   const scope = canvas.closest("section, main, body") || document;
   const list = scope.querySelector("[data-sentinel-list]") || document.getElementById("sentinel-list");
   const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
-  const COL = { sea: "#0b0e14", land: "#1a2130", line: "#2a3346", grid: "#151b27", live: "#4fd1a5", building: "#7aa2f7", planned: "#8a93a6", text: "#d7dce6", dim: "#8a93a6" };
+  const COL = { sea: "#0b0e14", land: "#1a2130", coast: "#4a5670", line: "#2a3346", grid: "#151b27", live: "#4fd1a5", building: "#7aa2f7", planned: "#8a93a6", text: "#d7dce6", dim: "#8a93a6" };
   let sentinels = [], coast = null, rot = -40, tilt = 16, dpr = Math.min(2, devicePixelRatio || 1);
   let hover = null, focus = null, dragging = false, last = null, idleAt = 0, spin = !reduced, vel = 0;
-  const IDLE_MS = 3000, SPIN = 0.06;
+  const IDLE_MS = 5000, SPIN = 0.06;
   function size() { const r = canvas.getBoundingClientRect(); const w = Math.max(1, Math.round(r.width)), h = Math.max(1, Math.round(r.height)); if (canvas.width !== w * dpr || canvas.height !== h * dpr) { canvas.width = w * dpr; canvas.height = h * dpr; } ctx.setTransform(dpr, 0, 0, dpr, 0, 0); return w > 2 && h > 2; }
   const rad = d => d * Math.PI / 180;
   function project(lat, lon, R, cx, cy) {
@@ -25,11 +27,14 @@ function mountGlobe(canvas) {
     const w = canvas.width / dpr, h = canvas.height / dpr, cx = w / 2, cy = h / 2, R = Math.min(w, h) * 0.44;
     if (w < 3 || h < 3) return;
     ctx.clearRect(0, 0, w, h);
-    ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.fillStyle = COL.sea; ctx.fill(); ctx.strokeStyle = COL.line; ctx.lineWidth = 1; ctx.stroke();
+    ctx.save(); ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.clip();
+    const shade = ctx.createRadialGradient(cx - R * 0.35, cy - R * 0.35, R * 0.1, cx, cy, R); shade.addColorStop(0, "#161c28"); shade.addColorStop(1, COL.sea);
+    ctx.fillStyle = shade; ctx.fillRect(cx - R, cy - R, R * 2, R * 2);
     ctx.strokeStyle = COL.grid; ctx.lineWidth = 0.6;
     for (let lat = -60; lat <= 60; lat += 30) { ctx.beginPath(); const pts = []; for (let lon = -180; lon <= 180; lon += 3) pts.push([lat, lon]); pathLatLon(pts, R, cx, cy); ctx.stroke(); }
     for (let lon = -180; lon < 180; lon += 30) { ctx.beginPath(); const pts = []; for (let lat = -90; lat <= 90; lat += 3) pts.push([lat, lon]); pathLatLon(pts, R, cx, cy); ctx.stroke(); }
-    if (coast) { ctx.fillStyle = COL.land; ctx.strokeStyle = COL.line; ctx.lineWidth = 0.8; for (const ring of coast) { ctx.beginPath(); if (pathLatLon(ring.map(([lon, lat]) => [lat, lon]), R, cx, cy)) { ctx.closePath(); ctx.fill(); ctx.stroke(); } } }
+    if (coast) { ctx.strokeStyle = COL.coast; ctx.lineWidth = 1; ctx.lineJoin = "round"; for (const ring of coast) { ctx.beginPath(); if (pathLatLon(ring.map(([lon, lat]) => [lat, lon]), R, cx, cy)) ctx.stroke(); } }
+    ctx.restore(); ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.strokeStyle = COL.line; ctx.lineWidth = 1; ctx.stroke();
     // watched places: the coverage. Many sentinels share a city; the dot grows with how many watch it.
     const cover = new Map();
     for (const s of sentinels) for (const wp of (s.watches || [])) { const k = wp.lat + "," + wp.lon; const e = cover.get(k) || { lat: wp.lat, lon: wp.lon, place: wp.place, by: [] }; e.by.push(s); cover.set(k, e); }
@@ -62,14 +67,11 @@ function mountGlobe(canvas) {
   canvas.addEventListener("mousedown", down); addEventListener("mousemove", move); addEventListener("mouseup", up);
   canvas.addEventListener("touchstart", down, { passive: false }); canvas.addEventListener("touchmove", move, { passive: false }); canvas.addEventListener("touchend", up);
     canvas.style.cursor = "grab"; canvas.style.touchAction = "pan-y";
-  // Auto-rotating content needs a user control: a pause/play button, and the spin stops while the
-  // canvas is hovered or focused, and under reduced motion.
-  const btn = scope.querySelector("[data-globe-pause]");
-  function setSpin(on) { spin = on && !reduced; idleAt = spin ? performance.now() - IDLE_MS : performance.now(); if (btn) { btn.setAttribute("aria-pressed", String(!spin)); btn.textContent = spin ? "Pause" : "Play"; } }
-  if (btn) { btn.addEventListener("click", () => setSpin(!spin)); setSpin(!reduced); }
-  canvas.tabIndex = 0; canvas.addEventListener("focus", () => { idleAt = performance.now() + 1e9; }); canvas.addEventListener("blur", () => { idleAt = performance.now(); });
-  canvas.addEventListener("mouseenter", () => { idleAt = performance.now() + 1e9; }); canvas.addEventListener("mouseleave", () => { hover = null; idleAt = performance.now(); });
-  canvas.addEventListener("keydown", e => { const step = 8; if (e.key === "ArrowLeft") { rot -= step; e.preventDefault(); } if (e.key === "ArrowRight") { rot += step; e.preventDefault(); } if (e.key === "ArrowUp") { tilt = Math.min(60, tilt + 5); e.preventDefault(); } if (e.key === "ArrowDown") { tilt = Math.max(-60, tilt - 5); e.preventDefault(); } if (e.key === " ") { setSpin(!spin); e.preventDefault(); } });
+  // No pause button. A touch, a drag, or an arrow key stops the turn; it starts again once the world has
+  // been left alone for IDLE_MS. Under reduced motion it never turns on its own.
+  idleAt = performance.now() - IDLE_MS;
+  canvas.tabIndex = 0; canvas.addEventListener("mouseleave", () => { hover = null; });
+  canvas.addEventListener("keydown", e => { const step = 8; let used = true; if (e.key === "ArrowLeft") rot -= step; else if (e.key === "ArrowRight") rot += step; else if (e.key === "ArrowUp") tilt = Math.min(60, tilt + 5); else if (e.key === "ArrowDown") tilt = Math.max(-60, tilt - 5); else used = false; if (used) { idleAt = performance.now(); e.preventDefault(); } });
   function render(data) { sentinels = data.sentinels || []; if (!list) return; list.innerHTML = "";
     for (const s of sentinels) { const li = document.createElement("li"); li.className = "sentinel " + s.status; li.tabIndex = 0;
       li.innerHTML = '<span class="dot"></span><span class="name"></span> <span class="dim"></span>';

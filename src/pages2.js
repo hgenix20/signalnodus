@@ -39,7 +39,7 @@ function statsHtml(cityLabel) {
 
 function globeStage(withList) {
   return `<div class="globe-stage"><canvas data-globe role="img" aria-label="A globe with a dot at every place the sentinels watch. Drag or use the arrow keys to turn it; space pauses the spin."></canvas></div>
-<div class="globe-controls"><button type="button" data-globe-pause aria-pressed="false">Pause</button><span class="legend"><span class="live">live</span><span class="building">building</span><span class="planned">planned</span></span></div>
+<div class="globe-controls"><span class="legend"><span class="live">live</span><span class="building">building</span><span class="planned">planned</span></span></div>
 ${withList ? '<ul data-sentinel-list aria-label="Sentinels"></ul>' : ""}`;
 }
 
@@ -115,7 +115,7 @@ export function reviewPage2() {
 export function watchPage2() {
   const inner = `<main>
   <section class="hero" id="world" tabindex="-1"><div class="wrap">
-    <div class="thesis"><span class="eyebrow">Where the sentinels are looking</span><h1>The Watch.</h1><p class="dim" style="max-width:44ch">Drag the world to turn it, or use the arrow keys. It spins on its own when you let go; Pause stops it.</p>${statsHtml("cities")}</div>
+    <div class="thesis"><span class="eyebrow">Where the sentinels are looking</span><h1>The Watch.</h1><p class="dim" style="max-width:44ch">Drag the world to turn it, or use the arrow keys. It turns on its own again five seconds after you let go.</p>${statsHtml("cities")}</div>
     <div>${globeStage(false)}</div>
   </div></section>
   <section class="chapter" id="sentinels" tabindex="-1"><div class="wrap">
