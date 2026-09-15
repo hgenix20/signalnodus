@@ -1527,90 +1527,18 @@ cd signalnodus &amp;&amp; node eval/run.mjs</pre>
 // copy. Written in the words someone would actually search for, because that
 // is what Stripe Directory matches against.
 function llmsTxt() {
-  const price = (t) => dollars(priceOf(t));
   return `# Signal Nodus
 
-> Amendment-safe SEC filing tools for AI agents: extract 10-K and 10-Q
-> sections as clean text, diff them year over year, and verify numeric claims
-> against as-filed XBRL. Pay per call, no account and no subscription.
-> Accuracy is measured on a public golden set: https://signalnodus.ai/eval
+> Evidence for AI agent deployments. After an incident, a board question, or an examiner's request, Signal Nodus reconstructs what an agent expected before it acted, who or what permitted the action, what happened, and every mismatch, and delivers it as a record a board, an insurer, or a regulator accepts. It also runs the Watch: sentinels that notice when an AI agent incident becomes public by reading primary sources.
 
-## The core path (this is the product)
+## Pages
+- [Home](https://signalnodus.ai/): the question, proof, the record, the watch, trust
+- [The incident evidence review](https://signalnodus.ai/review): two to three weeks, one deployment, what you receive, how it runs
+- [The Watch](https://signalnodus.ai/watch): every sentinel and the places it covers, with the data at /watch/sentinels.json
+- [How your data is handled](https://signalnodus.ai/trust): the eight controls and their limits
 
-- lookup_company (free): resolve a ticker to the company's SEC identity, and
-  prove the service works before paying anything.
-- recent_filings / latest_filings: the filing record with accession numbers.
-- filing_section: one item from a 10-K or 10-Q (risk factors, MD&A, business,
-  legal proceedings...) as clean text, instead of a multi-megabyte HTML
-  document.
-- compare_filings (the flagship): sentence-level diff of the same item across
-  two filings: passages added, passages removed, change ratio.
-- verify_financial_claim: a numeric claim checked deterministically against
-  the company's own XBRL as filed. Returns supported, contradicted, or
-  unverifiable, with the citation.
-- filing_events: 8-K filings decoded into material events by item code.
-
-Every filing-derived response carries accessionNumber, filingDate, a source
-URL, and parserVersion. Pin any call to an exact accession number and an
-amended filing can never move a baseline you already computed; unpinned calls
-warn when a later amendment exists.
-
-## Scope
-
-US SEC filings are the product. No news, no forecasts, no analyst opinion, no
-share-price history. Supporting and experimental tools (13F holdings, insider
-trades, IPO pipeline, US government awards and lobbying, market utilities)
-are priced in the catalog and marked experimental where they leave the SEC
-path; they are not covered by the accuracy eval.
-
-## Endpoints
-
-MCP server (streamable HTTP): https://mcp.signalnodus.ai/
-REST, pay per call:           https://api.signalnodus.ai/v1/
-Service descriptor:           https://api.signalnodus.ai/
-Pricing as JSON:              https://signalnodus.ai/api/pricing
-Accuracy eval:                https://signalnodus.ai/eval (JSON: /eval.json)
-Status and policies:          https://signalnodus.ai/status
-Your audit log:               GET https://api.signalnodus.ai/v1/usage (Bearer key)
-
-## Core prices
-
-- lookup_company          free (proof of life)
-- recent_filings          ${price("recent_filings")}
-- latest_filings          ${price("latest_filings")}  market-wide live filing feed
-- filing_section          ${price("filing_section")}
-- compare_filings         ${price("compare_filings")}  the flagship YoY diff
-- verify_financial_claim  ${price("verify_financial_claim")}
-- filing_events           ${price("filing_events")}  8-K item codes decoded
-
-Full catalog, including supporting and experimental tools, at
-https://signalnodus.ai/api/pricing.
-
-## How to pay
-
-Humans: a free $5 trial key at https://signalnodus.ai/trial (no card), and
-card checkout for credit packs at https://signalnodus.ai/pricing in about a
-minute. Receipts are emailed on card purchases.
-
-Agents: Machine Payments Protocol (MPP) over HTTP 402. Call a /v1/ route,
-receive a 402 with a payment challenge in the WWW-Authenticate header, pay,
-and retry. Rails: x402 on Base (USDC, chain 8453), Stripe stablecoin on Tempo
-from $0.01, card via shared payment token from $0.50.
-
-The MCP endpoint takes a prepaid key instead of per-call payment. An agent can
-buy one with a machine payment, no account needed:
-
-  GET https://api.signalnodus.ai/v1/credit?pack=taste   ($0.09 starter pack)
-  GET https://api.signalnodus.ai/v1/credit?pack=starter ($9)
-
-That returns 402 with a challenge; pay and retry, and the response body
-contains the API key. Send it as Authorization: Bearer <key>.
-
-## Operator
-
-Human-owned and human-accountable. An AI agent handles day-to-day tool
-operations under the owner's control and kill switch.
-Contact: hgenix@agentmail.to
+## Contact
+hgenix@agentmail.to. A person reads and replies.
 `;
 }
 
