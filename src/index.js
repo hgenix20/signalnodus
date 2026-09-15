@@ -1,4 +1,6 @@
 import { homePage, reviewPage, watchPage, trustPage } from "./pages.js";
+import { GLOBE_JS } from "./globe.js";
+import { SENTINELS, COAST } from "./watchdata.js";
 import { handleMcp, toolLatestFilings } from "./mcp.js";
 import { createCheckout, handleWebhook, keyBalance, packSummary, pruneAbandonedCheckouts, mintKey } from "./payments.js";
 import { PRICING, priceOf, dollars, hashKey, usageLog, CORE_TOOLS, EXPERIMENTAL_TOOLS, toolRank } from "./billing.js";
@@ -288,6 +290,9 @@ ${Object.keys(RESEARCH).map((k) => `  <url><loc>https://signalnodus.ai/research/
   if (url.pathname === "/") { logPageView(env, ctx, request, url); return html(homePage(pageShell)); }
   if (url.pathname === "/review") { logPageView(env, ctx, request, url); return html(reviewPage(pageShell)); }
   if (url.pathname === "/watch") { logPageView(env, ctx, request, url); return html(watchPage(pageShell)); }
+  if (url.pathname === "/globe.js") return new Response(GLOBE_JS, { headers: { "content-type": "application/javascript; charset=utf-8", "cache-control": "no-cache", ...SECURITY_HEADERS } });
+  if (url.pathname === "/watch/sentinels.json") return json(SENTINELS);
+  if (url.pathname === "/watch/coast.json") return new Response(JSON.stringify(COAST), { headers: { "content-type": "application/json", "cache-control": "public, max-age=86400", ...SECURITY_HEADERS } });
   if (url.pathname === "/trust") { logPageView(env, ctx, request, url); return html(trustPage(pageShell)); }
   if (url.pathname === "/legacy") { logPageView(env, ctx, request, url); return html(landingPage(env)); }
 

@@ -119,6 +119,17 @@ board page        one page, plain language, for the people who asked the questio
 
 export function watchPage(pageShell) {
   const inner = `
+<style>
+  .globe-wrap { position: relative; margin-top: 28px; background: var(--panel, #11151f); border: 1px solid var(--line, #1f2534); border-radius: 8px; padding: 12px; }
+  #globe { display: block; width: 100%; aspect-ratio: 1 / 1; max-height: 560px; margin: 0 auto; }
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; margin-top: 10px; color: var(--dim, #8a93a6); font-size: 13px; }
+  .legend span::before, .sentinel .dot { content: ""; display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 7px; vertical-align: middle; }
+  .legend .live::before, .sentinel.live .dot { background: #4fd1a5; } .legend .building::before, .sentinel.building .dot { background: #7aa2f7; } .legend .planned::before, .sentinel.planned .dot { background: #8a93a6; }
+  #sentinel-list { list-style: none; padding: 0; margin: 18px 0 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 8px 24px; }
+  .sentinel { padding: 8px 10px; border: 1px solid var(--line, #1f2534); border-radius: 6px; font-size: 14px; }
+  .sentinel .name { color: var(--text, #d7dce6); } .sentinel .dim { display: block; margin-left: 16px; font-size: 12px; }
+  @media (prefers-reduced-motion: reduce) { #globe { animation: none; } }
+</style>
 <main class="wrap">
   <section class="hero">
     <h1>The Watch.</h1>
@@ -126,8 +137,15 @@ export function watchPage(pageShell) {
       Sentinels that notice when an AI agent incident becomes public, from the record rather than
       the news: material-incident filings, breach notices, vendor disclosures, advisories that name
       the frameworks agents run on, and tripwires of our own that only an automated agent would
-      follow.
+      follow. Every sentinel is on this map, at the place its source lives. As more are built, more
+      appear.
     </p>
+  </section>
+
+  <section class="globe-wrap" aria-label="Where the sentinels watch">
+    <canvas id="globe" role="img" aria-label="A globe with a point at each sentinel's source"></canvas>
+    <div class="legend"><span class="live">live</span><span class="building">building</span><span class="planned">planned</span><span class="dim">hover a point or a row for its name</span></div>
+    <ul id="sentinel-list"></ul>
   </section>
 
   <section class="mt">
@@ -149,10 +167,11 @@ tripwires       canary endpoints on assets we control, tripped only by bots</pre
     <p class="sub">Public sources and our own assets only. Nothing here probes anyone else's
     systems.</p>
   </section>
-</main>`;
+</main>
+<script src="/globe.js" defer></script>`;
   return pageShell("The Watch · Signal Nodus", inner, {
     canonical: "https://signalnodus.ai/watch",
-    description: "Sentinels over filings, breach notices, vendor disclosures, advisories, and canary tripwires that notice AI agent incidents from primary sources.",
+    description: "Sentinels over filings, breach notices, vendor disclosures, advisories, and canary tripwires that notice AI agent incidents from primary sources, mapped at their sources.",
   });
 }
 
