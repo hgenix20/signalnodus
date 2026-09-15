@@ -1,5 +1,8 @@
 import { homePage, reviewPage, watchPage, trustPage } from "./pages.js";
 import { GLOBE_JS } from "./globe.js";
+import { homePage2, reviewPage2, watchPage2, trustPage2 } from "./pages2.js";
+import { SITE2_JS } from "./shell2.js";
+import { FONTS_CSS } from "./fonts.js";
 import { SENTINELS, COAST } from "./watchdata.js";
 import { handleMcp, toolLatestFilings } from "./mcp.js";
 import { createCheckout, handleWebhook, keyBalance, packSummary, pruneAbandonedCheckouts, mintKey } from "./payments.js";
@@ -287,13 +290,15 @@ ${Object.keys(RESEARCH).map((k) => `  <url><loc>https://signalnodus.ai/research/
   if (url.pathname === "/robots.txt") {
     return asset("User-agent: *\nAllow: /\nSitemap: https://signalnodus.ai/\n", "text/plain");
   }
-  if (url.pathname === "/") { logPageView(env, ctx, request, url); return html(homePage(pageShell)); }
-  if (url.pathname === "/review") { logPageView(env, ctx, request, url); return html(reviewPage(pageShell)); }
-  if (url.pathname === "/watch") { logPageView(env, ctx, request, url); return html(watchPage(pageShell)); }
+  if (url.pathname === "/") { logPageView(env, ctx, request, url); return html(homePage2()); }
+  if (url.pathname === "/review") { logPageView(env, ctx, request, url); return html(reviewPage2()); }
+  if (url.pathname === "/watch") { logPageView(env, ctx, request, url); return html(watchPage2()); }
+  if (url.pathname === "/fonts.css") return new Response(FONTS_CSS, { headers: { "content-type": "text/css; charset=utf-8", "cache-control": "public, max-age=604800", ...SECURITY_HEADERS } });
+  if (url.pathname === "/site2.js") return new Response(SITE2_JS, { headers: { "content-type": "application/javascript; charset=utf-8", "cache-control": "no-cache", ...SECURITY_HEADERS } });
   if (url.pathname === "/globe.js") return new Response(GLOBE_JS, { headers: { "content-type": "application/javascript; charset=utf-8", "cache-control": "no-cache", ...SECURITY_HEADERS } });
   if (url.pathname === "/watch/sentinels.json") return json(SENTINELS);
   if (url.pathname === "/watch/coast.json") return new Response(JSON.stringify(COAST), { headers: { "content-type": "application/json", "cache-control": "public, max-age=86400", ...SECURITY_HEADERS } });
-  if (url.pathname === "/trust") { logPageView(env, ctx, request, url); return html(trustPage(pageShell)); }
+  if (url.pathname === "/trust") { logPageView(env, ctx, request, url); return html(trustPage2()); }
   if (url.pathname === "/legacy") { logPageView(env, ctx, request, url); return html(landingPage(env)); }
 
   // Everything else is genuinely absent; saying so beats serving the landing
