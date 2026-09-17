@@ -34,7 +34,7 @@ const CONTROLS = `<ul class="controls">
 
 function statsHtml(cityLabel) {
   const t = watchStats();
-  return `<div class="stats" aria-label="The Watch today"><div class="stat"><b>${t.cities}</b><span>${cityLabel}</span></div><div class="stat"><b>${t.sentinels}</b><span>sentinels</span></div><div class="stat"><b>${t.building + t.live}</b><span>${t.live ? "live or building" : "being built"}</span></div></div>`;
+  return `<div class="stats" aria-label="The Watch today"><div class="stat"><b>${t.cities}</b><span>${cityLabel}</span></div><div class="stat"><b>${t.sentinels}</b><span>sentinels</span></div><div class="stat"><b>${t.live}</b><span>live${t.building ? `, ${t.building} being built` : ""}</span></div></div>`;
 }
 
 function globeStage(withList) {
