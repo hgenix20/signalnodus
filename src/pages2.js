@@ -50,8 +50,8 @@ export function homePage2() {
     <div class="thesis">
       <span class="eyebrow">Evidence for AI agent deployments</span>
       <h1>When an AI agent acts on your behalf, can you prove why it was allowed to?</h1>
-      <p class="dim" style="max-width:48ch">Signal Nodus reconstructs the record of an agent deployment after an incident, a board question, or an examiner's request, and watches the world for the next one.</p>
-      <p style="display:flex;gap:10px;flex-wrap:wrap"><a class="cta" href="mailto:hgenix@agentmail.to?subject=Incident%20evidence%20review">Request a review</a><a class="cta ghost" href="/review">How it works</a></p>
+      <p class="dim mw48">Signal Nodus reconstructs the record of an agent deployment after an incident, a board question, or an examiner's request, and watches the world for the next one.</p>
+      <p class="row"><a class="cta" href="mailto:hgenix@agentmail.to?subject=Incident%20evidence%20review">Request a review</a><a class="cta ghost" href="/review">How it works</a></p>
       ${statsHtml("cities watched")}
     </div>
     <div>${globeStage(false)}</div>
@@ -89,7 +89,7 @@ export function homePage2() {
 
   <section class="chapter" id="trust" tabindex="-1"><div class="wrap">
     <div class="stack"><span class="eyebrow">Trust</span><h2>Your logs never reach the system that does the reasoning.</h2><p class="dim">A review takes your agent's logs, which are proprietary. Raw data stays in a vault, the models see tokens in place of names, and every byte that leaves is logged and handed back to you with the pack.</p><p><a class="cta ghost" href="/trust">The eight controls</a></p></div>
-    <div class="stack-l"><p class="dim">A person owns and runs this service. An AI system does the reconstruction under that person's control, with a kill switch, and keeps the same record of its own work.</p><p style="margin-top:14px"><a class="cta" href="mailto:hgenix@agentmail.to?subject=Incident%20evidence%20review">Request a review</a></p></div>
+    <div class="stack-l"><p class="dim">A person owns and runs this service. An AI system does the reconstruction under that person's control, with a kill switch, and keeps the same record of its own work.</p><p class="mt14"><a class="cta" href="mailto:hgenix@agentmail.to?subject=Incident%20evidence%20review">Request a review</a></p></div>
   </div></section>
 </main>
 <script src="/globe.js" defer></script>`;
@@ -99,14 +99,14 @@ export function homePage2() {
 
 export function reviewPage2() {
   const inner = `<main>
-  <section class="chapter" id="review" tabindex="-1" style="border-top:0"><div class="wrap">
+  <section class="chapter bt0" id="review" tabindex="-1"><div class="wrap">
     <div class="stack"><span class="eyebrow">the incident evidence review</span><h1>The record, its gaps, and one page for the people who asked.</h1><p class="lede">Two to three weeks for one agent deployment. You provide the logs and two interviews.</p></div>
     <div class="stack-l">${RECORD}
       <div class="stack"><h3>Week one</h3><p class="dim">Scoping call. Log export under the data terms on the <a href="/trust">trust page</a>. First interview: who the agent acts for, and who was supposed to be able to stop it.</p></div>
       <div class="stack"><h3>Week two</h3><p class="dim">Reconstruction. Code rebuilds the timeline and the action record from the logs. Where the record is ambiguous a person decides, and the pack marks each of those decisions.</p></div>
       <div class="stack"><h3>Week three</h3><p class="dim">Second interview to check the reconstruction against what people remember. Delivery. A walk-through with whoever has to present it.</p></div>
       <div class="stack"><h3>What this is not</h3><p class="dim">The review reports what the record shows and where it is silent. It is not legal advice or a security assessment, and it makes no judgment about materiality. Those decisions stay with your counsel and your board.</p></div>
-      <div class="stack"><h3>After the review</h3><p class="dim">Most teams find the record should have been written as the agent ran. The same record keeping can run beside your agents from then on, so the next question already has its answer. Ask about it at the walk through.</p><p><a class="cta" href="mailto:hgenix@agentmail.to?subject=Incident%20evidence%20review">Request a review</a></p><p class="dim" style="font-size:14px">Email a few lines about the deployment and what was asked of it. A person replies within one business day.</p></div>
+      <div class="stack"><h3>After the review</h3><p class="dim">Most teams find the record should have been written as the agent ran. The same record keeping can run beside your agents from then on, so the next question already has its answer. Ask about it at the walk through.</p><p><a class="cta" href="mailto:hgenix@agentmail.to?subject=Incident%20evidence%20review">Request a review</a></p><p class="dim fs14">Email a few lines about the deployment and what was asked of it. A person replies within one business day.</p></div>
     </div>
   </div></section></main>`;
   return shell2("The incident evidence review · Signal Nodus", inner, { current: "/review", canonical: "https://signalnodus.ai/review", description: "A two-to-three-week reconstruction of an AI agent deployment's record after an incident: timeline, action record, gaps, oversight map, and a one-page board summary." });
@@ -115,7 +115,7 @@ export function reviewPage2() {
 export function watchPage2() {
   const inner = `<main>
   <section class="hero" id="world" tabindex="-1"><div class="wrap">
-    <div class="thesis"><span class="eyebrow">Where the sentinels are looking</span><h1>The Watch.</h1><p class="dim" style="max-width:44ch">Drag the world to turn it, or use the arrow keys. It turns on its own again five seconds after you let go.</p>${statsHtml("cities")}</div>
+    <div class="thesis"><span class="eyebrow">Where the sentinels are looking</span><h1>The Watch.</h1><p class="dim mw44">Drag the world to turn it, or use the arrow keys. It turns on its own again five seconds after you let go.</p>${statsHtml("cities")}</div>
     <div>${globeStage(false)}</div>
   </div></section>
   <section class="chapter" id="sentinels" tabindex="-1"><div class="wrap">
@@ -128,7 +128,7 @@ export function watchPage2() {
 
 export function trustPage2() {
   const inner = `<main>
-  <section class="chapter" id="trust" tabindex="-1" style="border-top:0"><div class="wrap">
+  <section class="chapter bt0" id="trust" tabindex="-1"><div class="wrap">
     <div class="stack"><span class="eyebrow">how your data is handled</span><h1>Raw data never reaches the system that does the reasoning.</h1><p class="lede">Eight controls, each one checkable.</p><p class="dim">The limits are stated too. A token pass that misses an identifier lets it through. Canaries catch systematic leaks and can miss a one off. Providers process tokenised text under their own terms. The contract comes first: data handling, deletion, and your written approval of the model terms.</p></div>
     <div class="stack-l">${CONTROLS}</div>
   </div></section></main>`;

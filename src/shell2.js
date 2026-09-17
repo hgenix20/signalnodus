@@ -1,5 +1,6 @@
 // The revamped shell. Tokens, type, the chapter rail, motion rules. Every page renders through it.
-// Fonts are self-hosted at /fonts.css (see fonts.js), inside the Worker's default-src 'self' policy.
+// Fonts are self-hosted at /fonts.css (see fonts.js) and this shell's CSS at /site2.css: the Worker's
+// policy is style-src 'self', which refuses an inline <style> block and inline style attributes alike.
 export const SHELL_CSS = String.raw`
 :root { --ground:#F8FAFC; --panel:#FFFFFF; --muted:#E9EEF5; --line:#CBD5E1; --text:#0F172A; --dim:#475569; --signal:#0E8F6B; --signal-ink:#0B6B50; --warn:#B45309; --band:#0B1120; --band-text:#E2E8F0; --band-dim:#94A3B8; --band-line:#1E293B;
   --display:"Instrument Serif", Georgia, "Times New Roman", serif; --body:"IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif; --mono:"IBM Plex Mono", ui-monospace, "Cascadia Code", Consolas, monospace; }
@@ -46,6 +47,9 @@ ul.controls { list-style: none; padding: 0; margin: 0; display: grid; gap: 14px;
 footer { border-top: 1px solid var(--line); margin-top: 104px; padding: 28px 0 56px; color: var(--dim); font: 400 13px var(--mono); letter-spacing: .04em; } footer a { color: var(--dim); }
 .proof { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; } .proof .item { background: var(--panel); border: 1px solid var(--line); border-radius: 4px; padding: 20px; } .proof .item h3 { font-size: 17px; } .proof .item p { font-size: 15px; margin-top: 8px; }
 .reveal { --d: 0ms; } @media (prefers-reduced-motion: no-preference) { .reveal { animation: reveal 700ms var(--d) both cubic-bezier(.2,.7,.2,1); } @keyframes reveal { from { transform: translateY(8px); } to { transform: none; } } }
+
+/* Utilities. The Worker's policy is style-src 'self', so nothing may be styled inline. */
+.mw48{max-width:48ch}.mw44{max-width:44ch}.row{display:flex;gap:10px;flex-wrap:wrap}.mt14{margin-top:14px}.bt0{border-top:0}.fs14{font-size:14px}
 `;
 export function shell2(title, inner, opts = {}) {
   const { canonical = "https://signalnodus.ai/", description = "", current = "/", index = true, rail = null } = opts;
@@ -62,7 +66,7 @@ export function shell2(title, inner, opts = {}) {
 <meta property="og:title" content="${title}"><meta property="og:description" content="${description}"><meta property="og:type" content="website"><meta property="og:site_name" content="Signal Nodus"><meta property="og:url" content="${canonical}">
 <script type="application/ld+json">${JSON.stringify({ "@context": "https://schema.org", "@type": "Organization", name: "Signal Nodus", url: "https://signalnodus.ai/", email: "hgenix@agentmail.to", description })}</script>
 <link rel="stylesheet" href="/fonts.css">
-<style>${SHELL_CSS}</style>
+<link rel="stylesheet" href="/site2.css">
 </head>
 <body>
 <header class="site"><div class="wrap"><a class="mark" href="/">SIGNAL<span class="dot">·</span>NODUS</a><button type="button" class="menu-btn" aria-expanded="false" aria-controls="site-nav">Menu</button><nav class="top" id="site-nav" aria-label="Site">${nav}</nav></div></header>

@@ -1,7 +1,7 @@
 import { homePage, reviewPage, watchPage, trustPage } from "./pages.js";
 import { GLOBE_JS } from "./globe.js";
 import { homePage2, reviewPage2, watchPage2, trustPage2 } from "./pages2.js";
-import { SITE2_JS } from "./shell2.js";
+import { SITE2_JS, SHELL_CSS } from "./shell2.js";
 import { FONTS_CSS } from "./fonts.js";
 import { SENTINELS, COAST } from "./watchdata.js";
 import { handleMcp, toolLatestFilings } from "./mcp.js";
@@ -279,6 +279,7 @@ async function apexResponse(request, url, env, ctx) {
   if (url.pathname === "/review") { logPageView(env, ctx, request, url); return html(reviewPage2()); }
   if (url.pathname === "/watch") { logPageView(env, ctx, request, url); return html(watchPage2()); }
   if (url.pathname === "/fonts.css") return new Response(FONTS_CSS, { headers: { "content-type": "text/css; charset=utf-8", "cache-control": "public, max-age=604800", ...SECURITY_HEADERS } });
+  if (url.pathname === "/site2.css") return new Response(SHELL_CSS, { headers: { "content-type": "text/css; charset=utf-8", "cache-control": "no-cache", ...SECURITY_HEADERS } });
   if (url.pathname === "/site2.js") return new Response(SITE2_JS, { headers: { "content-type": "application/javascript; charset=utf-8", "cache-control": "no-cache", ...SECURITY_HEADERS } });
   if (url.pathname === "/globe.js") return new Response(GLOBE_JS, { headers: { "content-type": "application/javascript; charset=utf-8", "cache-control": "no-cache", ...SECURITY_HEADERS } });
   if (url.pathname === "/watch/sentinels.json") return json(SENTINELS);
