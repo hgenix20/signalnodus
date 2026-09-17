@@ -2,6 +2,7 @@ import { homePage, reviewPage, watchPage, trustPage } from "./pages.js";
 import { GLOBE_JS } from "./globe.js";
 import { homePage2, reviewPage2, watchPage2, trustPage2 } from "./pages2.js";
 import { SITE2_JS, SHELL_CSS } from "./shell2.js";
+import { privacyPage3, termsPage3, gatePage3 } from "./pages3.js";
 import { FONTS_CSS } from "./fonts.js";
 import { SENTINELS, COAST } from "./watchdata.js";
 import { handleMcp, toolLatestFilings } from "./mcp.js";
@@ -237,7 +238,9 @@ async function apexResponse(request, url, env, ctx) {
   }
   if (url.pathname === "/pricing") { logPageView(env, ctx, request, url); return html(pricingPage()); }
   if (url.pathname === "/status") { logPageView(env, ctx, request, url); return statusPage(env, ctx); }
-  if (url.pathname === "/privacy") { logPageView(env, ctx, request, url); return html(privacyPage()); }
+  if (url.pathname === "/privacy") { logPageView(env, ctx, request, url); return html(privacyPage3()); }
+  if (url.pathname === "/terms") { logPageView(env, ctx, request, url); return html(termsPage3()); }
+  if (url.pathname === "/gate") { logPageView(env, ctx, request, url); return html(gatePage3()); }
   if (url.pathname === "/vs") { logPageView(env, ctx, request, url); return html(vsPage()); }
   if (url.pathname === "/compliance") { logPageView(env, ctx, request, url); return html(compliancePage()); }
   if (url.pathname === "/eval") { logPageView(env, ctx, request, url); return html(evalPage()); }
@@ -275,7 +278,7 @@ async function apexResponse(request, url, env, ctx) {
   }
   if (url.pathname === "/sitemap.xml") {
     const today = new Date().toISOString().slice(0, 10);
-    const urls = ["/", "/review", "/watch", "/trust", "/status"].map((u) => `  <url><loc>https://signalnodus.ai${u}</loc><lastmod>${today}</lastmod></url>`).join("\n");
+    const urls = ["/", "/review", "/gate", "/watch", "/trust", "/status", "/privacy", "/terms"].map((u) => `  <url><loc>https://signalnodus.ai${u}</loc><lastmod>${today}</lastmod></url>`).join("\n");
     return asset(`<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`, "application/xml");
   }
   if (url.pathname === "/robots.txt") {
@@ -1395,58 +1398,7 @@ function vsPage() {
 // (logPageView, logChallenge/logSettled in mpp.js, chargeKey/logUsage and
 // anonymizeIdentifiedRows in billing.js, handleTrial, payments.js, oauth.js).
 // Change the code, change this page in the same commit.
-function privacyPage() {
-  const inner = `
-<main class="wrap">
-  <section class="hero">
-    <h1>Privacy</h1>
-    <p class="lede">What Signal Nodus records when you use it, where it goes, how long it stays, and how to have it removed. Effective 2026-09-15.</p>
-    <p class="sub">Signal Nodus is a human-owned service with no separate legal entity. The operator is reachable at <a href="mailto:hgenix@agentmail.to">hgenix@agentmail.to</a>. The service runs on Cloudflare Workers with a Cloudflare D1 database, so Cloudflare handles every request as the hosting provider under its own terms.</p>
-  </section>
-
-  <section class="mt">
-    <h2>What is recorded, by activity</h2>
-    <table class="packs">
-      <tr><th>When you</th><th>We record</th><th>Kept</th></tr>
-      <tr><td>call a tool with an API key (MCP or HTTP)</td><td>a SHA-256 hash of the key (the key itself is never stored), the tool name, the price charged, the time, and the SEC accession number(s) the answer was built from</td><td>as the billing record for that key; you can read the last 30 days at <code>/v1/usage</code></td></tr>
-      <tr><td>call a priced route without a key (a payment challenge, a refused payment, or a settled machine payment)</td><td>your IP address, the first 80 characters of your user agent, the tool, the time, and the amount if a payment settled</td><td>IP and user agent are erased after 90 days; the row survives only as a count</td></tr>
-      <tr><td>view a page on signalnodus.ai</td><td>your IP address, the first 60 characters of your user agent, the path, and the time; obvious bots are skipped</td><td>IP and user agent are erased after 90 days</td></tr>
-      <tr><td>take a free test key at <code>/trial</code></td><td>a truncated SHA-256 hash of your IP address, stored as the key's label so one connection gets one key; the Turnstile check sends your IP and the challenge token to Cloudflare</td><td>for the life of the key</td></tr>
-      <tr><td>buy credit with a card</td><td>Stripe collects the card details and the email for the receipt; we never see the card. We store the hash of the key that was minted, Stripe's event ids (so a retried webhook cannot credit twice), and the pack bought</td><td>abandoned checkouts are deleted after 72 hours; completed ones stay as the billing record</td></tr>
-      <tr><td>pay per call over x402</td><td>the settlement is a public transaction on the Base blockchain handled by Coinbase's facilitator; on our side it is logged like any unkeyed call above</td><td>as above; the blockchain record is permanent and outside our control</td></tr>
-      <tr><td>connect through a client's OAuth flow (Claude.ai, Claude Desktop, Claude Code)</td><td>you paste your key on our consent page; it is sealed into an authorization code that expires in five minutes and handed back to your client as the bearer token. We store nothing about the connection</td><td>nothing kept</td></tr>
-      <tr><td>reveal the contact address on <code>/compliance</code></td><td>only the Turnstile check with Cloudflare; we store nothing</td><td>nothing kept</td></tr>
-      <tr><td>email us</td><td>your message, at our mail provider (AgentMail)</td><td>until the matter is closed</td></tr>
-    </table>
-    <p class="dim">Marketplaces that resell access (Toku, Virtuals ACP) hold their own buyers' identities; we receive an order reference and the job parameters.</p>
-  </section>
-
-  <section class="mt">
-    <h2>What leaves the service</h2>
-    <p class="sub">The arguments you send to a tool (tickers, CIKs, accession numbers, item codes, search phrases, and for experimental tools things like an address or a commodity code) go to the source that holds the data: SEC EDGAR for the core tools, and for the experimental ones EIA, USDA NASS, the US Census Bureau, USAspending, the Senate lobbying disclosure database, the ECB, Polymarket, public EVM RPC endpoints, and DNS and RDAP servers. Those requests carry our identity in the User-Agent, never yours. Responses are cached at the edge; they contain public data, not anything about you.</p>
-    <p class="sub">Payment providers see what they need to take a payment: Stripe for cards, Coinbase's facilitator for x402. Error logs at Cloudflare can include an IP address and user agent when a payment fails; Cloudflare retains those briefly under its own policy.</p>
-  </section>
-
-  <section class="mt">
-    <h2>What we do not do</h2>
-    <p class="sub">No selling or sharing of data for anyone else's use. No advertising. No profiling. No cookies of our own (Cloudflare's Turnstile and bot protection may set theirs). An MCP client sends us only the arguments of the tool it calls; we never receive or read your conversation. We do not collect anything a tool does not need to do its job.</p>
-  </section>
-
-  <section class="mt">
-    <h2>Your requests</h2>
-    <p class="sub">Email <a href="mailto:hgenix@agentmail.to">hgenix@agentmail.to</a>. To find your records, give the key hash (the first characters of <code>sha256(key)</code>) or the IP address and approximate time. We will send you what we hold and delete it on request, except a billing row that is needed to settle an open payment dispute. Replies within 24 hours, the same promise as for a wrong section.</p>
-  </section>
-
-  <section class="mt">
-    <h2>Changes</h2>
-    <p class="sub">The effective date at the top changes when this page does. A change that narrows a promise is announced on <a href="/status">the status page</a> before it takes effect.</p>
-  </section>
-</main>`;
-  return pageShell("Privacy · Signal Nodus", inner, {
-    canonical: "https://signalnodus.ai/privacy",
-    description: "What Signal Nodus records, where it goes, how long it stays, and how to have it removed.",
-  });
-}
+// The privacy page lives in pages3.js, in the second shell, with the terms and the gate.
 
 async function statusPage(env, ctx) {
   const checks = [];
@@ -1602,6 +1554,8 @@ function llmsTxt() {
 - [The incident evidence review](https://signalnodus.ai/review): two to three weeks, one deployment, what you receive, how it runs
 - [The Watch](https://signalnodus.ai/watch): every sentinel and the places it covers, with the data at /watch/sentinels.json
 - [How your data is handled](https://signalnodus.ai/trust): the eight controls and their limits
+- [The gate](https://signalnodus.ai/gate): a free, open-source Claude Code hook that stops destructive commands for a person to approve and records who allowed what
+- [Privacy](https://signalnodus.ai/privacy) and [terms](https://signalnodus.ai/terms)
 
 ## Contact
 hgenix@agentmail.to. A person reads and replies.

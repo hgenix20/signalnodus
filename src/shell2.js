@@ -48,12 +48,22 @@ footer { border-top: 1px solid var(--line); margin-top: 104px; padding: 28px 0 5
 .proof { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; } .proof .item { background: var(--panel); border: 1px solid var(--line); border-radius: 4px; padding: 20px; } .proof .item h3 { font-size: 17px; } .proof .item p { font-size: 15px; margin-top: 8px; }
 .reveal { --d: 0ms; } @media (prefers-reduced-motion: no-preference) { .reveal { animation: reveal 700ms var(--d) both cubic-bezier(.2,.7,.2,1); } @keyframes reveal { from { transform: translateY(8px); } to { transform: none; } } }
 
+/* Long-form pages (privacy, terms, the gate): section heads, a record table, and code. */
+.stack-l h2 { font: 400 clamp(24px, 2.6vw, 32px) var(--display); font-style: italic; margin: 12px 0 -8px; }
+.scroll { overflow-x: auto; }
+table.rec { width: 100%; border-collapse: collapse; font-size: 15px; line-height: 1.5; }
+table.rec th { text-align: left; font: 500 12px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--dim); padding: 10px 12px 10px 0; border-bottom: 1px solid var(--line); }
+table.rec td { vertical-align: top; padding: 12px 12px 12px 0; border-bottom: 1px solid var(--muted); color: var(--dim); min-width: 14ch; }
+table.rec td:first-child { color: var(--text); }
+code { font: 400 .92em var(--mono); background: var(--muted); padding: 1px 5px; border-radius: 3px; }
+pre.code { font: 400 14px/1.6 var(--mono); background: var(--band); color: var(--band-text); padding: 16px 18px; border-radius: 6px; overflow-x: auto; white-space: pre; }
+
 /* Utilities. The Worker's policy is style-src 'self', so nothing may be styled inline. */
 .mw48{max-width:48ch}.mw44{max-width:44ch}.row{display:flex;gap:10px;flex-wrap:wrap}.mt14{margin-top:14px}.bt0{border-top:0}.fs14{font-size:14px}
 `;
 export function shell2(title, inner, opts = {}) {
   const { canonical = "https://signalnodus.ai/", description = "", current = "/", index = true, rail = null } = opts;
-  const nav = [["/", "Home"], ["/review", "Review"], ["/watch", "The Watch"], ["/trust", "Trust"]]
+  const nav = [["/", "Home"], ["/review", "Review"], ["/gate", "The Gate"], ["/watch", "The Watch"], ["/trust", "Trust"]]
     .map(([h, l]) => `<a href="${h}"${h === current ? ' aria-current="page"' : ""}>${l}</a>`).join("");
   const railHtml = rail ? `<nav class="rail" aria-label="Chapters">${rail.map(([id, l], i) => `<a href="#${id}" data-chapter="${id}" accesskey="${i + 1}">${String(i + 1).padStart(2, "0")} ${l}</a>`).join("")}</nav>` : "";
   return `<!doctype html>
@@ -72,7 +82,7 @@ export function shell2(title, inner, opts = {}) {
 <header class="site"><div class="wrap"><a class="mark" href="/">SIGNAL<span class="dot">·</span>NODUS</a><button type="button" class="menu-btn" aria-expanded="false" aria-controls="site-nav">Menu</button><nav class="top" id="site-nav" aria-label="Site">${nav}</nav></div></header>
 ${railHtml}
 ${inner}
-<footer><div class="wrap">Signal Nodus · human-owned · <a href="/review">review</a> · <a href="/watch">the watch</a> · <a href="/trust">trust</a> · <a href="/status">status</a></div></footer>
+<footer><div class="wrap">Signal Nodus · human-owned · <a href="/review">review</a> · <a href="/watch">the watch</a> · <a href="/gate">the gate</a> · <a href="/trust">trust</a> · <a href="/status">status</a> · <a href="/privacy">privacy</a> · <a href="/terms">terms</a></div></footer>
 <script src="/site2.js" defer></script>
 </body>
 </html>`;
