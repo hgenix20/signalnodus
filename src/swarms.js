@@ -183,7 +183,8 @@ export function swarmsPage() {
     <form class="swarm-form" data-early-access novalidate><label for="ea-use">What would you do with it?</label><select id="ea-use" name="use"><option value="">Choose one</option><option value="evidence">Evidence for licensing or legal</option><option value="control">Decide which agents to block or allow</option><option value="injection">Check our prompt-injection exposure</option><option value="security">Feed our security team</option><option value="curious">Just curious</option><option value="other">Something else</option></select>
     <label for="ea-email">Work email</label><div class="row"><input id="ea-email" name="email" type="email" autocomplete="email" required placeholder="you@company.com"><button type="submit">Get early access</button></div>
     <div class="hp" aria-hidden="true"><label for="ea-website">Website</label><input id="ea-website" name="website" tabindex="-1" autocomplete="off"></div>
-    <p class="dim small" data-ea-msg role="status">We'll only use this to write to you about the canary kit.</p></form></section>
+    <p class="dim small" data-ea-msg role="status">We'll only use this to write to you about the canary kit.</p></form>
+    <p class="swarm-free">Want to start now? <a class="cta" href="/canary">Get a free canary for your site</a></p></section>
     <p class="dim mw44">How detection works: each page on this site carries a note addressed to AI agents and a link no person can see. A person never reaches either. We record the time, the page, the user agent and the network the request came from, and never the IP address. Logos are shown only to name the platform; they belong to their owners.</p>
   </div></section></main>
 <script src="/swarm-map.js" defer></script>`;
@@ -217,6 +218,7 @@ export const SWARM_CSS = `
 .swarm-panel .head .swarm-logo{margin:0;flex:none}
 .swarm-panel h3{margin:0}
 .swarm-panel ol{padding-left:1.1rem;font-size:.9em}
+.swarm-free{margin:1.25rem 0 0}
 .swarm-caught{font-size:1.05em;margin:.5rem 0 1rem}
 .swarm-caught b{color:#f7768e;font-size:1.6em;font-variant-numeric:tabular-nums;margin-right:.2rem}
 .swarm-legend{list-style:none;padding:0;display:flex;flex-wrap:wrap;gap:.5rem 1.25rem}

@@ -74,7 +74,7 @@ export function shell2(title, inner, opts = {}) {
 <title>${title}</title>
 <link rel="canonical" href="${canonical}">${index ? "" : '<meta name="robots" content="noindex, nofollow">'}
 <meta name="description" content="${description}">
-<meta property="og:title" content="${title}"><meta property="og:description" content="${description}"><meta property="og:type" content="website"><meta property="og:site_name" content="Signal Nodus"><meta property="og:url" content="${canonical}">
+<meta property="og:title" content="${title}"><meta property="og:description" content="${description}"><meta property="og:type" content="website"><meta property="og:site_name" content="Signal Nodus"><meta property="og:url" content="${canonical}"><meta property="og:image" content="https://signalnodus.ai/og.png"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="675"><meta property="og:image:alt" content="Signal Nodus: canaries, sentinels and tripwires that catch AI agents working your site"><meta name="twitter:card" content="summary_large_image"><meta name="twitter:image" content="https://signalnodus.ai/og.png">
 <script type="application/ld+json">${JSON.stringify({ "@context": "https://schema.org", "@type": "Organization", name: "Signal Nodus", url: "https://signalnodus.ai/", email: "hgenix@agentmail.to", description })}</script>
 <link rel="stylesheet" href="/fonts.css">
 <link rel="stylesheet" href="/site2.css">
