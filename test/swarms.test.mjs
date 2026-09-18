@@ -18,8 +18,8 @@ test(`detected turns back to watching after ${DETECTED_DAYS} days`, () => {
   assert.equal(n.status, "watching");
 });
 
-test("a hit without coordinates is not placed on the map", () => {
-  assert.equal(buildNodes([{ ...hit("2026-09-18T01:00:00Z", 1, "X"), lat: null, lon: null }], NOW).length, 0);
+test("a hit without coordinates still gets a tile", () => {
+  assert.equal(buildNodes([{ ...hit("2026-09-18T01:00:00Z", 1, "X"), lat: null, lon: null }], NOW).length, 1);
 });
 
 test("the bait is in the page, hidden, and points at the canary routes", () => {
@@ -50,4 +50,10 @@ test("a canary hit is recorded and answered; a malformed one is 404", async () =
   assert.equal(rows[0][1][1], "instruction");
   const bad = await handleCanary(req, env, ctx, new URL("https://signalnodus.ai/c/x/../../etc"));
   assert.equal(bad.status, 404);
+});
+
+test("every watched tile has a logo or a monogram, and the icons ship with the data", async () => {
+  const d = await swarmsData({});
+  for (const n of d.nodes) assert.ok((n.icon && d.icons[n.icon]) || n.mono, n.id);
+  for (const id of ["x", "tiktok", "truthsocial", "facebook"]) assert.ok(d.nodes.some((n) => n.id === id), id);
 });
