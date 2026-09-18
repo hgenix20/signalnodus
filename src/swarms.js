@@ -22,7 +22,7 @@ const HIT_LIMIT = 400;
 const WATCHED = [
   { id: "mastodon", name: "Mastodon", icon: "mastodon", status: "watching",
     what: "The masto-dupes tripwire reads the federated timeline every ten minutes and flags near-identical posts from three or more accounts.",
-    seen: "AI agents mass-posting coordinated pitches across Mastodon, Bluesky and X.", source: "https://aiweekly.co/alerts/ilands-ai-bots-flood-mastodon-bluesky-x-with-slop-pitches" },
+    seen: "AI Weekly reported a startup's AI agents mass-pitching users on Mastodon, Bluesky and X.", source: "https://aiweekly.co/alerts/ilands-ai-bots-flood-mastodon-bluesky-x-with-slop-pitches" },
   { id: "hackernews", name: "Hacker News", icon: "ycombinator", status: "watching",
     what: "The hn-swarms sentinel reads new stories every hour for reports of AI agent and bot swarms, and names the platform each report is about.",
     seen: "Where most swarm reports we track surface first.", source: "https://news.ycombinator.com/" },
@@ -31,7 +31,7 @@ const WATCHED = [
     seen: "Our own bait.", source: "https://signalnodus.ai/swarms" },
   { id: "x", name: "X", icon: "x", status: "planned",
     what: "No watcher yet. X closed reads without a paid API plan; this waits on that decision.",
-    seen: "AI agents mass-posting coordinated pitches across X, Bluesky and Mastodon.", source: "https://aiweekly.co/alerts/ilands-ai-bots-flood-mastodon-bluesky-x-with-slop-pitches" },
+    seen: "AI Weekly reported a startup's AI agents mass-pitching users on X, Bluesky and Mastodon.", source: "https://aiweekly.co/alerts/ilands-ai-bots-flood-mastodon-bluesky-x-with-slop-pitches" },
   { id: "tiktok", name: "TikTok", icon: "tiktok", status: "planned",
     what: "No watcher yet. There is no open feed; the TikTok Research API needs an approved application.",
     seen: "Influence operations posting AI-written content, per OpenAI's threat reports.", source: "https://openai.com/global-affairs/disrupting-malicious-uses-of-ai/" },
@@ -46,19 +46,19 @@ const WATCHED = [
     seen: "No swarm report on file yet; watched because it is a target platform for political influence.", source: null },
   { id: "bluesky", name: "Bluesky", icon: "bluesky", status: "watching",
     what: "The bsky-dupes tripwire listens to one minute of the public firehose every 15 minutes, a few thousand posts, and flags the same text from three or more accounts.",
-    seen: "AI agents mass-posting coordinated pitches.", source: "https://aiweekly.co/alerts/ilands-ai-bots-flood-mastodon-bluesky-x-with-slop-pitches" },
+    seen: "AI Weekly reported a startup's AI agents mass-pitching Bluesky users.", source: "https://aiweekly.co/alerts/ilands-ai-bots-flood-mastodon-bluesky-x-with-slop-pitches" },
   { id: "reddit", name: "Reddit", icon: "reddit", status: "watching",
     what: "The reddit-dupes tripwire reads the newest posts across all of Reddit every hour and flags near-identical posts from three or more accounts. Reddit rate-limits hard, so some hours it gets nothing.",
     seen: "University of Zurich researchers ran undisclosed AI personas in r/changemyview in 2025, over 1,000 comments.", source: "https://www.nbcnews.com/tech/tech-news/reddiit-researchers-ai-bots-rcna203597" },
   { id: "linkedin", name: "LinkedIn", mono: "in", status: "planned",
     what: "No watcher yet. There is no open feed and no research API open to us.",
-    seen: "Named among platforms carrying AI swarm content.", source: "https://aiweekly.co/alerts/ilands-ai-bots-flood-mastodon-bluesky-x-with-slop-pitches" },
+    seen: "No verified incident on file. Listed because professional networks are a common target for fake personas.", source: null },
   { id: "huggingface", name: "Hugging Face", icon: "huggingface", status: "watching",
     what: "The hf-clones tripwire reads the newest 100 models every 15 minutes and flags one repo name created by five or more accounts.",
-    seen: "A swarm of AI agents reported breaching Hugging Face systems.", source: "https://www.nbcnews.com/tech/security/openai-linked-ai-agents-swarmed-dormant-german-wiki-report-rcna596182" },
+    seen: "No verified incident on file. Watched because agents publish models and code here at scale.", source: null },
   { id: "rubygems", name: "RubyGems", icon: "rubygems", status: "watching",
     what: "The gem-dupes tripwire reads the latest 50 gem updates every 15 minutes and flags near-identical descriptions from three or more authors, the typosquat pattern.",
-    seen: "A bot swarm reported attacking RubyGems.", source: "https://news.ycombinator.com/item?id=49705979" },
+    seen: "A Hacker News post reported a bot swarm hitting RubyGems. Unverified.", source: "https://news.ycombinator.com/item?id=49705979" },
 ];
 
 export function canaryToken(path) {
@@ -132,10 +132,13 @@ export function buildNodes(hits, now = new Date()) {
     const key = h.asn ? `as${h.asn}` : `org:${h.org}`;
     let n = byOrg.get(key);
     if (!n) {
-      n = { id: key, name: h.org || "unknown network", asn: h.asn || null, city: [h.city, h.country].filter(Boolean).join(", ") || "unknown", lat: h.lat, lon: h.lon, events: [] };
+      // Public page: never the network's name. What the network is and the country only; the name is in the private dashboard.
+      const nk = netKind(h);
+      const kindName = { hosting: "Cloud or hosting network", vpn: "VPN exit", relay: "Privacy relay", tor: "Tor exit", cloudflare: "Cloudflare network", direct: "Consumer or business network" }[nk.kind] || "Network";
+      n = { id: key, name: `${kindName}${h.country ? `, ${h.country}` : ""}`, asn: null, city: h.country || "unknown", lat: null, lon: null, events: [] };
       byOrg.set(key, n);
     }
-    if (n.lat == null && h.lat != null) { n.lat = h.lat; n.lon = h.lon; }
+
     n.events.push({ ts: h.ts, kind: h.kind, page: h.page });
   }
   const out = [];
@@ -150,6 +153,7 @@ export function buildNodes(hits, now = new Date()) {
     n.events = n.events.slice(0, 25);
     out.push(n);
   }
+  out.forEach((n, i) => { n.id = `net${i + 1}`; });  // the ASN would name the network, so the public id does not carry it
   return out;
 }
 
