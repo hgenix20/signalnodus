@@ -1,5 +1,6 @@
 import { homePage, reviewPage, watchPage, trustPage } from "./pages.js";
 import { handleEarlyAccess } from "./waitlist.js";
+import { handleRegister, handleSitePage, canaryPage, CANARY_JS, CANARY_CSS } from "./sites.js";
 import { indexPage, publicData, INDEX_CSS } from "./agentindex.js";
 import { handleHit, noCountResponse, ANALYTICS_JS } from "./analytics.js";
 import { handleCanary, swarmsPage, swarmsData, SWARM_JS, SWARM_CSS } from "./swarms.js";
@@ -282,11 +283,11 @@ async function apexResponse(request, url, env, ctx) {
   }
   if (url.pathname === "/sitemap.xml") {
     const today = new Date().toISOString().slice(0, 10);
-    const urls = ["/", "/review", "/gate", "/watch", "/swarms", "/agents-index", "/trust", "/status", "/privacy", "/terms"].map((u) => `  <url><loc>https://signalnodus.ai${u}</loc><lastmod>${today}</lastmod></url>`).join("\n");
+    const urls = ["/", "/review", "/gate", "/watch", "/swarms", "/agents-index", "/canary", "/trust", "/status", "/privacy", "/terms"].map((u) => `  <url><loc>https://signalnodus.ai${u}</loc><lastmod>${today}</lastmod></url>`).join("\n");
     return asset(`<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`, "application/xml");
   }
   if (url.pathname === "/robots.txt") {
-    return asset("User-agent: *\nAllow: /\nDisallow: /key\nDisallow: /dashboard\nDisallow: /legacy\nDisallow: /c/\nDisallow: /nocount\nSitemap: https://signalnodus.ai/sitemap.xml\n", "text/plain");
+    return asset("User-agent: *\nAllow: /\nDisallow: /key\nDisallow: /dashboard\nDisallow: /legacy\nDisallow: /c/\nDisallow: /nocount\nDisallow: /site/\nSitemap: https://signalnodus.ai/sitemap.xml\n", "text/plain");
   }
   if (url.pathname === "/") { logPageView(env, ctx, request, url); return html(homePage2()); }
   if (url.pathname === "/review") { logPageView(env, ctx, request, url); return html(reviewPage2()); }
@@ -305,6 +306,11 @@ async function apexResponse(request, url, env, ctx) {
   if (url.pathname === "/a.js") return new Response(ANALYTICS_JS, { headers: { "content-type": "application/javascript; charset=utf-8", "cache-control": "public, max-age=3600", ...SECURITY_HEADERS } });
   if (url.pathname === "/nocount") return noCountResponse();
   if (url.pathname.startsWith("/c/")) return handleCanary(request, env, ctx, url);
+  if (url.pathname === "/canary") { logPageView(env, ctx, request, url); return html(canaryPage()); }
+  if (url.pathname === "/canary.js") return new Response(CANARY_JS, { headers: { "content-type": "application/javascript; charset=utf-8", "cache-control": "no-cache", ...SECURITY_HEADERS } });
+  if (url.pathname === "/canary.css") return new Response(CANARY_CSS, { headers: { "content-type": "text/css; charset=utf-8", "cache-control": "no-cache", ...SECURITY_HEADERS } });
+  if (url.pathname === "/api/sites") return handleRegister(request, env, ctx);
+  if (url.pathname.startsWith("/site/")) { const r = await handleSitePage(env, url); for (const [k, v] of Object.entries(SECURITY_HEADERS)) if (!r.headers.has(k)) r.headers.set(k, v); return r; }
   if (url.pathname === "/swarms") { logPageView(env, ctx, request, url); return html(swarmsPage()); }
   if (url.pathname === "/swarms.json") return new Response(JSON.stringify(await swarmsData(env)), { headers: { "content-type": "application/json", "cache-control": "no-store", ...SECURITY_HEADERS } });
   if (url.pathname === "/swarm-map.js") return new Response(SWARM_JS, { headers: { "content-type": "application/javascript; charset=utf-8", "cache-control": "no-cache", ...SECURITY_HEADERS } });

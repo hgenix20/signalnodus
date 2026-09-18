@@ -74,7 +74,7 @@ export function canaryHtml(path) {
 
 let tableReady = false;
 // Columns added after the table first shipped. Each ALTER fails harmlessly once the column exists.
-const EXTRA_COLUMNS = ["accept TEXT", "accept_language TEXT", "referer TEXT", "sec_ch_ua TEXT", "http_protocol TEXT", "tls_version TEXT", "tls_cipher TEXT", "colo TEXT", "rtt INTEGER", "region TEXT", "timezone TEXT", "bot_score INTEGER", "verified_bot INTEGER", "ja4 TEXT", "ja3 TEXT", "net_kind TEXT", "hidden INTEGER"];
+const EXTRA_COLUMNS = ["accept TEXT", "accept_language TEXT", "referer TEXT", "sec_ch_ua TEXT", "http_protocol TEXT", "tls_version TEXT", "tls_cipher TEXT", "colo TEXT", "rtt INTEGER", "region TEXT", "timezone TEXT", "bot_score INTEGER", "verified_bot INTEGER", "ja4 TEXT", "ja3 TEXT", "net_kind TEXT", "hidden INTEGER", "site TEXT"];
 async function ensureTable(env) {
   if (tableReady) return;
   await env.BILLING.prepare(
@@ -82,14 +82,24 @@ async function ensureTable(env) {
   ).run();
   for (const col of EXTRA_COLUMNS) await env.BILLING.prepare(`ALTER TABLE canary_hits ADD COLUMN ${col}`).run().catch(() => {});
   await env.BILLING.prepare("CREATE INDEX IF NOT EXISTS canary_hits_ts ON canary_hits (ts)").run().catch(() => {});
+  await env.BILLING.prepare("CREATE INDEX IF NOT EXISTS canary_hits_site ON canary_hits (site, ts)").run().catch(() => {});
   tableReady = true;
 }
 
 const clip = (v, n) => String(v ?? "").replace(/[\u0000-\u001f]/g, " ").slice(0, n);
 
 export async function handleCanary(request, env, ctx, url) {
-  const m = /^\/c\/([it])\/([A-Za-z0-9_]{1,40})$/.exec(url.pathname);
-  if (!m) return new Response("not found", { status: 404 });
+  // Our own pages: /c/<i|t>/<page>. A customer site's bait: /c/s/<site id>/<i|t>, page from the referer.
+  let m = /^\/c\/([it])\/([A-Za-z0-9_]{1,40})$/.exec(url.pathname);
+  let site = null;
+  if (!m) {
+    const sm = /^\/c\/s\/(s[0-9a-f]{12})\/([it])$/.exec(url.pathname);
+    if (!sm) return new Response("not found", { status: 404 });
+    site = sm[1];
+    let page = "unknown";
+    try { page = new URL(request.headers.get("referer") || "").pathname || "unknown"; } catch {}
+    m = [null, sm[2], clip(page, 120)];
+  }
   const cf = request.cf || {};
   if (env?.BILLING && ctx?.waitUntil) {
     ctx.waitUntil((async () => {
@@ -99,14 +109,14 @@ export async function handleCanary(request, env, ctx, url) {
       try { refHost = new URL(request.headers.get("referer") || "").host || null; } catch {}
       const bm = cf.botManagement || {};
       const nk = netKind({ asn: cf.asn, org: cf.asOrganization, country: cf.country });
-      await env.BILLING.prepare("INSERT INTO canary_hits (ts, kind, page, ua, asn, org, country, city, lat, lon, accept, accept_language, referer, sec_ch_ua, http_protocol, tls_version, tls_cipher, colo, rtt, region, timezone, bot_score, verified_bot, ja4, ja3, net_kind, hidden) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+      await env.BILLING.prepare("INSERT INTO canary_hits (ts, kind, page, ua, asn, org, country, city, lat, lon, accept, accept_language, referer, sec_ch_ua, http_protocol, tls_version, tls_cipher, colo, rtt, region, timezone, bot_score, verified_bot, ja4, ja3, net_kind, hidden, site) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
         .bind(new Date().toISOString(), m[1] === "i" ? "instruction" : "trap", m[2], clip(request.headers.get("user-agent") || "none", 160),
           Number(cf.asn) || null, clip(cf.asOrganization || "unknown network", 80), clip(cf.country, 4), clip(cf.city, 60),
           Number(cf.latitude) || null, Number(cf.longitude) || null,
           h("accept", 120), h("accept-language", 60), refHost, h("sec-ch-ua", 160), clip(cf.httpProtocol, 12) || null, clip(cf.tlsVersion, 12) || null,
           clip(cf.tlsCipher, 60) || null, clip(cf.colo, 8) || null, Number(cf.clientTcpRtt) || null, clip(cf.region, 60) || null, clip(cf.timezone, 40) || null,
           Number.isFinite(bm.score) ? bm.score : null, bm.verifiedBot ? 1 : 0, clip(bm.ja4, 40) || null, clip(bm.ja3Hash, 40) || null,
-          nk.kind, nk.hidden ? 1 : 0)
+          nk.kind, nk.hidden ? 1 : 0, site)
         .run();
     })().catch(() => {}));
   }
@@ -143,13 +153,15 @@ export function buildNodes(hits, now = new Date()) {
   return out;
 }
 
+export { ensureTable as ensureCanaryTable };
+
 export async function swarmsData(env) {
   let hits = [];
   let error = null;
   if (env?.BILLING) {
     try {
       await ensureTable(env);
-      const r = await env.BILLING.prepare("SELECT ts, kind, page, ua, asn, org, country, city, lat, lon FROM canary_hits ORDER BY id DESC LIMIT ?").bind(HIT_LIMIT).all();
+      const r = await env.BILLING.prepare("SELECT ts, kind, page, ua, asn, org, country, city, lat, lon FROM canary_hits WHERE site IS NULL ORDER BY id DESC LIMIT ?").bind(HIT_LIMIT).all();
       hits = r.results || [];
     } catch (e) { error = "canary store unavailable"; }
   }
