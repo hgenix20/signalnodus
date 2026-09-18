@@ -50,25 +50,25 @@ export function termsPage3() {
   const inner = `<main>
   <section class="chapter bt0" id="terms" tabindex="-1"><div class="wrap">
     <div class="stack"><span class="eyebrow">terms</span><h1>The terms, in the order you are likely to need them.</h1>
-      <p class="lede">Effective ${EFFECTIVE}. Signal Nodus is owned and run by a person, with no separate legal entity. Using the site, the gate or the API means you accept what is written here.</p></div>
+      <p class="lede">Effective ${EFFECTIVE}. Signal Nodus is owned and run by a person, with no separate legal entity. Using the site, the gate or the review means you accept what is written here.</p></div>
     <div class="stack-l">
-      <h2>1. The site and the Watch</h2>
-      <p class="dim">The pages describe a method and a service. The Watch lists public sources and what they published. Every signal is a claim until someone verifies it, and nothing on the Watch is a statement that a named firm did anything wrong. Nothing here is legal advice, a security assessment, or a judgment about materiality.</p>
-      <h2>2. The incident evidence review</h2>
-      <p class="dim">A review is a professional engagement. It starts only with a signed statement of work and signed data terms, and those documents govern it, including scope, price, confidentiality and what happens to your logs. Nothing on this site is an offer you accept by clicking, and an email asking for a review commits neither of us.</p>
-      <h2>3. The gate</h2>
-      <p class="dim">The gate is open source under the MIT licence and comes as it is. It is a pattern list over command text. It reduces one kind of accident and does not replace least-privilege credentials, backups, or review. You run it on your own machines at your own risk.</p>
-      <h2>4. The SEC filings API and MCP server</h2>
-      <p class="dim">The tools return public SEC data with its accession number and source link. They are not investment advice, and the measured accuracy at <a href="/eval">/eval</a> is a measurement, not a guarantee. Prices are those at <a href="/legacy">the API page</a> and <code>/api/pricing</code> at the time of the call. Credit is prepaid; a key is a bearer secret and calls made with it are yours. Unused prepaid credit is refunded on request to the original payment method. Keep to the rate limits, do not use the service to break the SEC's fair-access rules, and do not resell a key. We may suspend a key that is abused, and we will say why.</p>
-      <h2>5. Availability and changes</h2>
-      <p class="dim">The service is run with care and without an uptime promise; <a href="/status">the status page</a> shows its state. Tools, prices and these terms can change. A change to the terms is dated at the top of this page, and a change to a price never applies to a call already made.</p>
-      <h2>6. Liability</h2>
-      <p class="dim">To the extent the law allows, the site, the gate and the API are provided as they are, without warranties, and the operator's total liability for them is limited to what you paid in the three months before the claim. A signed engagement sets its own terms and this paragraph does not limit them.</p>
+      <h2>1. The incident evidence review</h2>
+      <p class="dim">A review is a professional engagement: one agent deployment, two to three weeks, the record, its gaps, and a one-page summary for the people who asked. It starts only with a signed statement of work and signed data terms, and those documents govern it: scope, price, confidentiality, and what happens to your logs (the controls are on <a href="/trust">the trust page</a>). Nothing on this site is an offer you accept by clicking, and an email asking for a review commits neither of us. The review reports what the record shows and where it is silent. It is not legal advice or a security assessment, and it makes no judgment about materiality; those decisions stay with your counsel and your board.</p>
+      <h2>2. The gate</h2>
+      <p class="dim">The gate is open source under the MIT licence and comes as it is. It is a pattern list over command text that stops a fixed set of destructive commands for a person to approve and keeps a local record. It reduces one kind of accident and does not replace least-privilege credentials, backups, or review. It sends nothing anywhere. You run it on your own machines at your own risk.</p>
+      <h2>3. The Watch and the site</h2>
+      <p class="dim">The Watch lists public sources and what they published. Every signal is a claim until someone verifies it, and nothing on the Watch is a statement that a named firm did anything wrong. The pages describe a method and a service; they are not legal advice.</p>
+      <h2>4. Availability and changes</h2>
+      <p class="dim">The site and the gate are run with care and without an uptime promise; <a href="/status">the status page</a> shows their state. These terms can change; a change is dated at the top of this page. A signed engagement keeps the terms it was signed under.</p>
+      <h2>5. Liability</h2>
+      <p class="dim">To the extent the law allows, the site, the gate and the Watch are provided as they are, without warranties, and the operator's total liability for them is limited to what you paid for them, which for the gate and the site is nothing. A signed engagement sets its own terms and this paragraph does not limit them.</p>
+      <h2>6. The earlier API</h2>
+      <p class="dim">An SEC filings API and MCP server from before this service still run for existing keys at the prices in <code>/api/pricing</code>. Its data is public SEC filings with their source, not investment advice; credit is prepaid and unused credit is refunded on request; keep to the rate limits and do not resell a key. It is not what this site is about, and it may be retired with notice on <a href="/status">the status page</a>.</p>
       <h2>7. Contact</h2>
       <p class="dim">${MAIL}. A person reads and replies within one business day. Privacy is covered at <a href="/privacy">/privacy</a>.</p>
     </div>
   </div></section></main>`;
-  return shell2("Terms · Signal Nodus", inner, { current: "/terms", canonical: "https://signalnodus.ai/terms", description: "Terms for the Signal Nodus site, the Watch, the incident evidence review, the open-source gate, and the SEC filings API." });
+  return shell2("Terms · Signal Nodus", inner, { current: "/terms", canonical: "https://signalnodus.ai/terms", description: "Terms for the incident evidence review, the open-source gate, the Watch, and the Signal Nodus site." });
 }
 
 const GATE_SETTINGS = `{
