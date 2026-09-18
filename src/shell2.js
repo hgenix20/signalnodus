@@ -64,7 +64,7 @@ pre.code { font: 400 14px/1.6 var(--mono); background: var(--band); color: var(-
 `;
 export function shell2(title, inner, opts = {}) {
   const { canonical = "https://signalnodus.ai/", description = "", current = "/", index = true, rail = null } = opts;
-  const nav = [["/", "Home"], ["/review", "Review"], ["/gate", "The Gate"], ["/watch", "The Watch"], ["/trust", "Trust"]]
+  const nav = [["/", "Home"], ["/review", "Review"], ["/gate", "The Gate"], ["/watch", "The Watch"], ["/swarms", "Swarms"], ["/trust", "Trust"]]
     .map(([h, l]) => `<a href="${h}"${h === current ? ' aria-current="page"' : ""}>${l}</a>`).join("");
   const railHtml = rail ? `<nav class="rail" aria-label="Chapters">${rail.map(([id, l], i) => `<a href="#${id}" data-chapter="${id}" accesskey="${i + 1}">${String(i + 1).padStart(2, "0")} ${l}</a>`).join("")}</nav>` : "";
   return `<!doctype html>

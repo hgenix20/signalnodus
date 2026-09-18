@@ -83,7 +83,7 @@ export function homePage2() {
   </div></section>
 
   <section class="chapter" id="watch" tabindex="-1"><div class="wrap">
-    <div class="stack"><span class="eyebrow">The watch</span><h2>Sentinels that notice incidents from the record, not the news.</h2><p class="dim">The sentinels read incident filings, breach notices, vendor disclosures, and security advisories that name the frameworks agents run on. A few are tripwires on our own servers that only an automated agent would follow. The globe above shows where each one is looking, and it fills in as more are built.</p><p><a class="cta ghost" href="/watch">Every sentinel, mapped</a></p></div>
+    <div class="stack"><span class="eyebrow">The watch</span><h2>Sentinels that notice incidents from the record, not the news.</h2><p class="dim">The sentinels read incident filings, breach notices, vendor disclosures, and security advisories that name the frameworks agents run on. A few are tripwires on our own servers that only an automated agent would follow. The globe above shows where each one is looking, and it fills in as more are built.</p><p><a class="cta ghost" href="/watch">Every sentinel, mapped</a> <a class="cta ghost" href="/swarms">The swarm watch</a></p></div>
     <div class="stack-l">${WATCH_BLOCK}<p class="dim">Every signal is treated as a claim until someone verifies it. The sentinels read public sources and our own servers only.</p></div>
   </div></section>
 
