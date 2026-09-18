@@ -1,3 +1,4 @@
+import { canaryHtml } from "./swarms.js";
 // The revamped shell. Tokens, type, the chapter rail, motion rules. Every page renders through it.
 // Fonts are self-hosted at /fonts.css (see fonts.js) and this shell's CSS at /site2.css: the Worker's
 // policy is style-src 'self', which refuses an inline <style> block and inline style attributes alike.
@@ -82,7 +83,7 @@ export function shell2(title, inner, opts = {}) {
 <header class="site"><div class="wrap"><a class="mark" href="/">SIGNAL<span class="dot">·</span>NODUS</a><button type="button" class="menu-btn" aria-expanded="false" aria-controls="site-nav">Menu</button><nav class="top" id="site-nav" aria-label="Site">${nav}</nav></div></header>
 ${railHtml}
 ${inner}
-<footer><div class="wrap">Signal Nodus · human-owned · <a href="/review">review</a> · <a href="/watch">the watch</a> · <a href="/gate">the gate</a> · <a href="/trust">trust</a> · <a href="/status">status</a> · <a href="/privacy">privacy</a> · <a href="/terms">terms</a></div></footer>
+<footer><div class="wrap">Signal Nodus · human-owned · <a href="/review">review</a> · <a href="/watch">the watch</a> · <a href="/gate">the gate</a> · <a href="/trust">trust</a> · <a href="/swarms">swarm map</a> · <a href="/status">status</a> · <a href="/privacy">privacy</a> · <a href="/terms">terms</a></div>${canaryHtml(current)}</footer>
 <script src="/site2.js" defer></script>
 </body>
 </html>`;
