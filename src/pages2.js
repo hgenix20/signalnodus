@@ -46,15 +46,28 @@ ${withList ? '<ul data-sentinel-list aria-label="Sentinels"></ul>' : ""}`;
 export function homePage2() {
   const inner = `
 <main>
-  <section class="hero" id="world" tabindex="-1"><div class="wrap">
-    <div class="thesis">
-      <span class="eyebrow">Evidence for AI agent deployments</span>
-      <h1>When an AI agent acts on your behalf, can you prove why it was allowed to?</h1>
-      <p class="dim mw48">Signal Nodus reconstructs the record of an agent deployment after an incident, a board question, or an examiner's request, and watches the world for the next one.</p>
-      <p class="row"><a class="cta" href="mailto:hgenix@agentmail.to?subject=Incident%20evidence%20review">Request a review</a><a class="cta ghost" href="/review">How it works</a></p>
-      ${statsHtml("cities watched")}
+  <section class="hx" id="top" tabindex="-1"><div class="wrap">
+    <div>
+      <span class="eyebrow">AI agent detection</span>
+      <h1>Catch the AI agents working your site.</h1>
+      <p class="lede">Canaries, sentinels and tripwires turn what agents do into alerts you can act on: which agent, from where, and whether it hid.</p>
+      <p class="row"><a class="cta" href="/canary">Get a free canary</a><a class="cta ghost" href="/agents-index">See what we've caught</a></p>
+      <a class="proofpill" href="/agents-index">First agent caught on 18 Sep 2026, disguised as an iPhone</a>
     </div>
-    <div>${globeStage(false)}</div>
+    <div class="products">
+      <a class="product canary" href="/canary"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 7h.01"/><path d="M3.4 18H12a8 8 0 0 0 8-8V7a4 4 0 0 0-7.28-2.3L2 20"/><path d="m20 7 2 .5-2 .5"/><path d="M10 18v3"/><path d="M14 17.75V21"/><path d="M7 18a6 6 0 0 0 3.84-10.61"/></svg></span><div><h3>Canaries <span class="tag">On your site</span></h3><p>Two invisible lines only an agent will act on. See who took the bait, from where, and whether a VPN hid it.</p></div></a>
+      <a class="product sentinel" href="/watch"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.07 4.93A10 10 0 0 0 6.99 3.34"/><path d="M4 6h.01"/><path d="M2.29 9.62A10 10 0 1 0 21.31 8.35"/><path d="M16.24 7.76A6 6 0 1 0 8.23 16.67"/><path d="M12 18h.01"/><path d="M17.99 11.66A6 6 0 0 1 15.77 16.67"/><circle cx="12" cy="12" r="2"/><path d="m13.41 10.59 5.66-5.66"/></svg></span><div><h3>Sentinels <span class="tag">Public records</span></h3><p>Incident filings, advisories and swarm reports, read on a schedule, every hit sourced.</p></div></a>
+      <a class="product tripwire" href="/swarms"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2"/></svg></span><div><h3>Tripwires <span class="tag">Live feeds</span></h3><p>Swarm patterns across Reddit, Bluesky, Mastodon, Hugging Face and RubyGems.</p></div></a>
+    </div>
+  </div></section>
+
+  <section class="chapter" id="how" tabindex="-1"><div class="wrap">
+    <div class="stack"><span class="eyebrow">How the canary works</span><h2>Five minutes to set up. Nothing for people to see.</h2></div>
+    <ol class="steps">
+      <li><h3>Paste two lines</h3><p class="dim">A hidden note that asks an agent to fetch a URL, and a link robots.txt forbids. Readers never see either.</p></li>
+      <li><h3>Agents take the bait</h3><p class="dim">Anything that follows the note or the link is automated by construction, so every hit is a real agent.</p></li>
+      <li><h3>You see who</h3><p class="dim">Your private page shows the claimed agent, the network, the country, and whether it hid behind a VPN or a cloud server.</p></li>
+    </ol>
   </div></section>
 
   <section class="chapter" id="proof" tabindex="-1"><div class="wrap">

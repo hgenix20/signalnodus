@@ -61,6 +61,54 @@ pre.code { font: 400 14px/1.6 var(--mono); background: var(--band); color: var(-
 
 /* Utilities. The Worker's policy is style-src 'self', so nothing may be styled inline. */
 .mw48{max-width:48ch}.mw44{max-width:44ch}.row{display:flex;gap:10px;flex-wrap:wrap}.mt14{margin-top:14px}.bt0{border-top:0}.fs14{font-size:14px}
+/* ---- Revamp 2026-09-18: design-system/signal-nodus/MASTER.md overrides (dark trust navy, Inter, one accent per product) ---- */
+:root { --ground:#020617; --ground-2:#0B1426; --panel:#0F1B33; --panel-2:#0C1528; --muted:#111C33; --line:#1E2A44; --text:#E2E8F0; --fg:#F8FAFC; --dim:#A8B3C7; --signal:#FBBF24; --signal-ink:#FBBF24; --warn:#F87171; --band:#0B1426; --band-text:#F8FAFC; --band-dim:#A8B3C7; --band-line:#1E2A44;
+  --canary:#FBBF24; --sentinel:#60A5FA; --tripwire:#F87171; --ink-on-canary:#0B1426;
+  --display:"Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; --body:"Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+html, body { background: linear-gradient(160deg, var(--ground) 0%, var(--ground-2) 100%) fixed; color: var(--text); }
+body { font: 400 17px/1.6 var(--body); }
+a { color: var(--fg); text-decoration-color: #3B4A66; } a:hover { text-decoration-color: var(--canary); }
+:focus-visible { outline: 2px solid var(--canary); }
+header.site { background: color-mix(in srgb, var(--ground) 82%, transparent); border-bottom-color: var(--line); }
+.mark { color: var(--fg); } .mark .dot { color: var(--canary); }
+nav.top a { color: var(--dim); } nav.top a:hover { color: var(--fg); } nav.top a[aria-current="page"] { color: var(--fg); background: var(--muted); }
+.menu-btn { color: var(--fg); border-color: var(--line); }
+@media (max-width: 720px) { nav.top { background: var(--panel); border-color: var(--line); } }
+h1, h2 { font: 800 clamp(34px, 5.2vw, 64px)/1.06 var(--display); font-style: normal; letter-spacing: -.025em; color: var(--fg); }
+h2 { font-weight: 700; font-size: clamp(26px, 3.2vw, 40px); letter-spacing: -.015em; }
+h3 { font: 600 20px/1.35 var(--body); color: var(--fg); }
+.eyebrow { font: 600 12px var(--body); letter-spacing: .16em; color: var(--dim); }
+.lede { color: var(--text); } .dim { color: var(--dim); }
+section.chapter { border-top-color: var(--line); }
+.hero { background: transparent; }
+.cta { font: 600 15px var(--body); color: var(--ink-on-canary); background: var(--canary); border-radius: 10px; padding: 0 22px; box-shadow: 0 6px 20px rgba(251,191,36,.18); transition: transform 180ms ease, box-shadow 180ms ease; }
+.cta:hover { background: #FCD34D; transform: translateY(-1px); box-shadow: 0 10px 26px rgba(251,191,36,.26); }
+.cta.ghost { color: var(--fg); background: transparent; border: 1px solid var(--line); box-shadow: none; } .cta.ghost:hover { border-color: var(--dim); background: var(--muted); }
+@media (prefers-reduced-motion: reduce) { .cta, .cta:hover { transition: none; transform: none; } }
+.stat, .sentinel, pre.record { background: var(--panel); border-color: var(--line); border-radius: 12px; }
+footer { border-top-color: var(--line); color: var(--dim); font: 400 13px var(--body); } footer a { color: var(--dim); }
+/* Home revamp */
+.hx { padding-block: 72px 56px; } .hx .wrap { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 56px; align-items: center; }
+@media (max-width: 900px) { .hx { padding-block: 40px 32px; } .hx .wrap { grid-template-columns: 1fr; gap: 32px; } }
+.hx h1 { max-width: 13ch; } .hx .lede { max-width: 40ch; color: var(--dim); margin-top: 18px; }
+.hx .row { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 28px; }
+.proofpill { display: inline-flex; align-items: center; gap: 10px; margin-top: 28px; padding: 10px 16px; border: 1px solid var(--line); border-radius: 999px; background: var(--muted); font: 600 14px var(--body); color: var(--fg); text-decoration: none; }
+.proofpill::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--tripwire); box-shadow: 0 0 0 4px rgba(248,113,113,.18); }
+.products { display: grid; gap: 16px; }
+.product { position: relative; display: grid; grid-template-columns: 56px 1fr; gap: 18px; align-items: start; padding: 22px 22px 22px 26px; border: 1px solid var(--line); border-radius: 18px; background: linear-gradient(90deg, var(--panel), var(--panel-2)); text-decoration: none; color: inherit; transition: border-color 180ms ease, transform 180ms ease; }
+.product::before { content: ""; position: absolute; left: 0; top: 18px; bottom: 18px; width: 4px; border-radius: 2px; background: var(--accent); }
+.product:hover { border-color: var(--accent); transform: translateY(-2px); } @media (prefers-reduced-motion: reduce) { .product, .product:hover { transition: none; transform: none; } }
+.product .ic { width: 56px; height: 56px; border-radius: 14px; display: grid; place-items: center; background: color-mix(in srgb, var(--accent) 12%, transparent); border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent); }
+.product .ic svg { width: 28px; height: 28px; stroke: var(--accent); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.product h3 { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; flex-wrap: wrap; }
+.product .tag { font: 600 11px var(--body); letter-spacing: .14em; text-transform: uppercase; color: var(--accent); }
+.product p { color: var(--dim); margin-top: 6px; font-size: 16px; }
+.product.canary { --accent: var(--canary); } .product.sentinel { --accent: var(--sentinel); } .product.tripwire { --accent: var(--tripwire); }
+.steps { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; counter-reset: st; }
+@media (max-width: 860px) { .steps { grid-template-columns: 1fr; } }
+.steps li { counter-increment: st; border: 1px solid var(--line); border-radius: 16px; padding: 22px; background: var(--panel); }
+.steps li::before { content: counter(st); display: inline-grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; background: var(--muted); color: var(--canary); font: 700 15px var(--body); margin-bottom: 12px; }
+.proof .item { border-color: var(--line); background: var(--panel); border-radius: 14px; }
 `;
 export function shell2(title, inner, opts = {}) {
   const { canonical = "https://signalnodus.ai/", description = "", current = "/", index = true, rail = null } = opts;
