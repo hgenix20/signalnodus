@@ -11,6 +11,7 @@
 // mind's box, which turns new hits into incident_signal events.
 import { shell2 } from "./shell2.js";
 import { BRAND_ICONS } from "./brandicons.js";
+import { netKind } from "./netkind.js";
 
 export const DETECTED_DAYS = 14;
 const HIT_LIMIT = 400;
@@ -72,11 +73,15 @@ export function canaryHtml(path) {
 }
 
 let tableReady = false;
+// Columns added after the table first shipped. Each ALTER fails harmlessly once the column exists.
+const EXTRA_COLUMNS = ["accept TEXT", "accept_language TEXT", "referer TEXT", "sec_ch_ua TEXT", "http_protocol TEXT", "tls_version TEXT", "tls_cipher TEXT", "colo TEXT", "rtt INTEGER", "region TEXT", "timezone TEXT", "bot_score INTEGER", "verified_bot INTEGER", "ja4 TEXT", "ja3 TEXT", "net_kind TEXT", "hidden INTEGER"];
 async function ensureTable(env) {
   if (tableReady) return;
   await env.BILLING.prepare(
     "CREATE TABLE IF NOT EXISTS canary_hits (id INTEGER PRIMARY KEY AUTOINCREMENT, ts TEXT NOT NULL, kind TEXT NOT NULL, page TEXT NOT NULL, ua TEXT, asn INTEGER, org TEXT, country TEXT, city TEXT, lat REAL, lon REAL)",
   ).run();
+  for (const col of EXTRA_COLUMNS) await env.BILLING.prepare(`ALTER TABLE canary_hits ADD COLUMN ${col}`).run().catch(() => {});
+  await env.BILLING.prepare("CREATE INDEX IF NOT EXISTS canary_hits_ts ON canary_hits (ts)").run().catch(() => {});
   tableReady = true;
 }
 
@@ -89,10 +94,19 @@ export async function handleCanary(request, env, ctx, url) {
   if (env?.BILLING && ctx?.waitUntil) {
     ctx.waitUntil((async () => {
       await ensureTable(env);
-      await env.BILLING.prepare("INSERT INTO canary_hits (ts, kind, page, ua, asn, org, country, city, lat, lon) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+      const h = (n, len) => clip(request.headers.get(n) || "", len) || null;
+      let refHost = null;
+      try { refHost = new URL(request.headers.get("referer") || "").host || null; } catch {}
+      const bm = cf.botManagement || {};
+      const nk = netKind({ asn: cf.asn, org: cf.asOrganization, country: cf.country });
+      await env.BILLING.prepare("INSERT INTO canary_hits (ts, kind, page, ua, asn, org, country, city, lat, lon, accept, accept_language, referer, sec_ch_ua, http_protocol, tls_version, tls_cipher, colo, rtt, region, timezone, bot_score, verified_bot, ja4, ja3, net_kind, hidden) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
         .bind(new Date().toISOString(), m[1] === "i" ? "instruction" : "trap", m[2], clip(request.headers.get("user-agent") || "none", 160),
           Number(cf.asn) || null, clip(cf.asOrganization || "unknown network", 80), clip(cf.country, 4), clip(cf.city, 60),
-          Number(cf.latitude) || null, Number(cf.longitude) || null)
+          Number(cf.latitude) || null, Number(cf.longitude) || null,
+          h("accept", 120), h("accept-language", 60), refHost, h("sec-ch-ua", 160), clip(cf.httpProtocol, 12) || null, clip(cf.tlsVersion, 12) || null,
+          clip(cf.tlsCipher, 60) || null, clip(cf.colo, 8) || null, Number(cf.clientTcpRtt) || null, clip(cf.region, 60) || null, clip(cf.timezone, 40) || null,
+          Number.isFinite(bm.score) ? bm.score : null, bm.verifiedBot ? 1 : 0, clip(bm.ja4, 40) || null, clip(bm.ja3Hash, 40) || null,
+          nk.kind, nk.hidden ? 1 : 0)
         .run();
     })().catch(() => {}));
   }

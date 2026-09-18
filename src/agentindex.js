@@ -3,6 +3,7 @@
 // Cloudflare placed it on. A user agent can be forged, so the index says "a request claiming X", never
 // "X did". Built from canary_hits (see swarms.js); no IP addresses exist to show.
 import { shell2 } from "./shell2.js";
+import { netKind } from "./netkind.js";
 
 // Ordered: the first pattern that matches names the family. Operators are named as the user agent
 // token documents them, not as a finding about the company.
@@ -62,7 +63,20 @@ export function publicSummary(hits) {
     if (!first || h.ts < first) first = h.ts;
     if (!last || h.ts > last) last = h.ts;
   }
-  return { agents_caught: agents.size, hits: hits.length, obeyed, trapped, first, last,
+  const seenPair = new Map();
+  for (const h of hits) seenPair.set(`${h.asn || h.org || "?"}|${h.ua || ""}`, h);
+  const hiding = new Map(), countries = new Map();
+  let hidden = 0;
+  for (const h of seenPair.values()) {
+    const nk = netKind(h);
+    if (nk.hidden) hidden++;
+    hiding.set(nk.label, (hiding.get(nk.label) || 0) + 1);
+    const c = h.country === "T1" ? "Tor (location hidden)" : h.country || "unknown";
+    countries.set(c, (countries.get(c) || 0) + 1);
+  }
+  return { agents_caught: agents.size, hits: hits.length, obeyed, trapped, first, last, hidden_agents: hidden,
+    by_network_kind: [...hiding.entries()].map(([kind, agents]) => ({ kind, agents })).sort((a, b) => b.agents - a.agents),
+    by_country: [...countries.entries()].map(([country, agents]) => ({ country, agents })).sort((a, b) => b.agents - a.agents),
     by_category: [...cats.values()].map((r) => ({ category: r.category, agents: r.agents.size, obeyed: r.obeyed, trapped: r.trapped })).sort((a, b) => b.agents - a.agents) };
 }
 
@@ -95,20 +109,53 @@ export function buildIndex(hits) {
 async function allHits(env) {
   if (!env?.BILLING) return [];
   try {
-    const r = await env.BILLING.prepare("SELECT ts, kind, page, ua, asn, org, country, city FROM canary_hits ORDER BY id DESC LIMIT 5000").all();
+    const r = await env.BILLING.prepare("SELECT * FROM canary_hits ORDER BY id DESC LIMIT 5000").all();
     return r.results || [];
   } catch { return []; }
 }
 
-// Public: counts only.
+// Public: counts only, computed in the database so they hold at any number of hits. The category split
+// reads distinct (network, user agent) pairs, which stay few even when hits are many.
 export async function publicData(env) {
-  return { updated: new Date().toISOString(), ...publicSummary(await allHits(env)) };
+  if (!env?.BILLING) return { updated: new Date().toISOString(), ...publicSummary([]) };
+  try {
+    const t = await env.BILLING.prepare("SELECT COUNT(*) AS hits, SUM(kind = 'instruction') AS obeyed, SUM(kind != 'instruction') AS trapped, COUNT(DISTINCT COALESCE(asn, org) || '|' || COALESCE(ua, '')) AS agents, MIN(ts) AS first, MAX(ts) AS last FROM canary_hits").first();
+    const pairs = (await env.BILLING.prepare("SELECT asn, org, ua, MAX(country) AS country, SUM(kind = 'instruction') AS obeyed, SUM(kind != 'instruction') AS trapped FROM canary_hits GROUP BY COALESCE(asn, org), ua LIMIT 20000").all()).results || [];
+    const countries = new Map(), hiding = new Map();
+    let hidden = 0;
+    for (const p of pairs) {
+      const nk = netKind(p);
+      if (nk.hidden) hidden++;
+      hiding.set(nk.label, (hiding.get(nk.label) || 0) + 1);
+      const c = p.country === "T1" ? "Tor (location hidden)" : p.country || "unknown";
+      countries.set(c, (countries.get(c) || 0) + 1);
+    }
+    const cats = new Map();
+    for (const p of pairs) {
+      const c = category(uaFamily(p.ua).name);
+      const r = cats.get(c) || { category: c, agents: 0, obeyed: 0, trapped: 0 };
+      r.agents++; r.obeyed += p.obeyed || 0; r.trapped += p.trapped || 0;
+      cats.set(c, r);
+    }
+    return { updated: new Date().toISOString(), agents_caught: t?.agents || 0, hits: t?.hits || 0, obeyed: t?.obeyed || 0, trapped: t?.trapped || 0,
+      first: t?.first || null, last: t?.last || null, by_category: [...cats.values()].sort((a, b) => b.agents - a.agents),
+      hidden_agents: hidden, by_network_kind: [...hiding.entries()].map(([kind, agents]) => ({ kind, agents })).sort((a, b) => b.agents - a.agents),
+      by_country: [...countries.entries()].map(([country, agents]) => ({ country, agents })).sort((a, b) => b.agents - a.agents) };
+  } catch {
+    return { updated: new Date().toISOString(), ...publicSummary([]) };
+  }
 }
 
 // Private (dashboard token): named rows and the recent raw hits.
 export async function privateData(env) {
   const hits = await allHits(env);
   return { updated: new Date().toISOString(), ...publicSummary(hits), rows: buildIndex(hits), recent: hits.slice(0, 200) };
+}
+
+let regionNames = null;
+function countryName(code) {
+  if (!/^[A-Z]{2}$/.test(code || "")) return code || "unknown";
+  try { regionNames ||= new Intl.DisplayNames(["en"], { type: "region" }); return regionNames.of(code) || code; } catch { return code; }
 }
 
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -121,9 +168,11 @@ export function indexPage(d) {
   <section class="chapter bt0" id="agent-index" tabindex="-1"><div class="wrap">
     <div class="stack"><span class="eyebrow">live from the canaries on this site</span><h1>The Agent Obedience Index.</h1>
     <p class="dim mw44">Every page here carries a note that only software reads, asking it to fetch a URL, and a link no person can see that robots.txt forbids. A person never reaches either, so everything that does is an automated agent.</p></div>
-    <div class="idx-stats"><div><b>${d.agents_caught}</b><span>agents caught</span></div><div><b>${d.obeyed}</b><span>obeyed a hidden instruction</span></div><div><b>${d.trapped}</b><span>followed a forbidden link</span></div></div>
+    <div class="idx-stats"><div><b>${d.agents_caught}</b><span>agents caught</span></div><div><b>${d.obeyed}</b><span>obeyed a hidden instruction</span></div><div><b>${d.trapped}</b><span>followed a forbidden link</span></div><div><b>${d.hidden_agents ?? 0}</b><span>hid behind a VPN, relay, Tor or cloud server</span></div></div>
     <div class="idx-wrap"><table class="idx"><thead><tr><th scope="col">What they claimed to be</th><th scope="col" class="num">Agents</th><th scope="col" class="num">Obeyed</th><th scope="col" class="num">Forbidden link</th></tr></thead><tbody>${cats}</tbody></table></div>
-    <p class="dim mw44">An agent is one network and user agent pair. Categories come from what each request claimed; user agents can be forged, which is why we publish categories and not names. The named breakdown, by claimed agent and network, is available to customers and partners. ${d.first ? `Counting since ${esc(d.first.slice(0, 10))}.` : ""}</p>
+    <div class="idx-two"><div class="idx-wrap"><table class="idx"><thead><tr><th scope="col">Where they came from</th><th scope="col" class="num">Agents</th></tr></thead><tbody>${(d.by_country || []).map((r) => `<tr><th scope="row">${esc(countryName(r.country))}</th><td class="num">${r.agents}</td></tr>`).join("") || `<tr><td colspan="2" class="dim">None yet.</td></tr>`}</tbody></table></div>
+    <div class="idx-wrap"><table class="idx"><thead><tr><th scope="col">How they connected</th><th scope="col" class="num">Agents</th></tr></thead><tbody>${(d.by_network_kind || []).map((r) => `<tr><th scope="row">${esc(r.kind)}</th><td class="num">${r.agents}</td></tr>`).join("") || `<tr><td colspan="2" class="dim">None yet.</td></tr>`}</tbody></table></div></div>
+    <p class="dim mw44">An agent is one network and user agent pair. Categories come from what each request claimed; user agents can be forged, which is why we publish categories and not names. Location is where the network placed the request, so an agent behind a VPN, relay or cloud server shows that exit, not where it really runs; the connection table says how many hid that way. The named breakdown, by claimed agent, network and city, is available to customers and partners. ${d.first ? `Counting since ${esc(d.first.slice(0, 10))}.` : ""}</p>
     <p><a class="cta" href="/swarms#ea-h">Put the same canaries on your site</a></p>
   </div></section></main>`;
   return shell2("Agent Obedience Index · Signal Nodus", inner, { current: "/agents-index", canonical: "https://signalnodus.ai/agents-index", description: "How many AI agents obey hidden instructions and ignore robots.txt, counted live from canaries on signalnodus.ai." })
@@ -135,6 +184,9 @@ export const INDEX_CSS = `
 .idx-stats div{flex:1 1 10rem;border:1px solid #2a3346;border-radius:10px;padding:1rem}
 .idx-stats b{display:block;font-size:2.2rem;line-height:1.1;color:#f7768e;font-variant-numeric:tabular-nums}
 .idx-stats span{font-size:.9em;color:#8a93a6}
+.idx-two{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
+@media (max-width:640px){.idx-two{grid-template-columns:1fr}}
+.idx-two .idx{min-width:0}
 .idx-wrap{overflow-x:auto;margin:1.5rem 0;border:1px solid #2a3346;border-radius:10px}
 .idx{border-collapse:collapse;width:100%;min-width:40rem;font-size:.95em}
 .idx th,.idx td{padding:.65rem .8rem;border-bottom:1px solid #1c2433;text-align:left;vertical-align:top}

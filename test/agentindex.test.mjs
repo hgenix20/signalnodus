@@ -36,3 +36,15 @@ test("the public summary counts agents and categories, and the page names no cla
   assert.match(html, /2<\/b><span>agents caught/);
   assert.match(indexPage(publicSummary([])), /Nothing has taken the bait yet/);
 });
+
+import { netKind } from "../src/netkind.js";
+test("network kind flags hidden origins", () => {
+  assert.equal(netKind({ asn: 132203, org: "Tencent" }).kind, "hosting");
+  assert.equal(netKind({ asn: 13335 }).kind, "cloudflare");
+  assert.equal(netKind({ asn: 1, org: "x", country: "T1" }).kind, "tor");
+  assert.equal(netKind({ asn: 9009, org: "M247" }).kind, "vpn");
+  assert.equal(netKind({ asn: 7922, org: "Comcast" }).hidden, false);
+  const d = publicSummary([{ ts: "2026-09-18T11:00:00Z", kind: "trap", page: "home", ua: "Mozilla/5.0 (iPhone)", asn: 132203, org: "Tencent", country: "US" }]);
+  assert.equal(d.hidden_agents, 1);
+  assert.match(indexPage(d), /United States/);
+});
