@@ -1,5 +1,6 @@
 import { homePage, reviewPage, watchPage, trustPage } from "./pages.js";
 import { handleEarlyAccess } from "./waitlist.js";
+import { indexPage, indexData, INDEX_CSS } from "./agentindex.js";
 import { handleHit, noCountResponse, ANALYTICS_JS } from "./analytics.js";
 import { handleCanary, swarmsPage, swarmsData, SWARM_JS, SWARM_CSS } from "./swarms.js";
 import { GLOBE_JS } from "./globe.js";
@@ -281,7 +282,7 @@ async function apexResponse(request, url, env, ctx) {
   }
   if (url.pathname === "/sitemap.xml") {
     const today = new Date().toISOString().slice(0, 10);
-    const urls = ["/", "/review", "/gate", "/watch", "/trust", "/status", "/privacy", "/terms"].map((u) => `  <url><loc>https://signalnodus.ai${u}</loc><lastmod>${today}</lastmod></url>`).join("\n");
+    const urls = ["/", "/review", "/gate", "/watch", "/swarms", "/agents-index", "/trust", "/status", "/privacy", "/terms"].map((u) => `  <url><loc>https://signalnodus.ai${u}</loc><lastmod>${today}</lastmod></url>`).join("\n");
     return asset(`<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`, "application/xml");
   }
   if (url.pathname === "/robots.txt") {
@@ -296,6 +297,9 @@ async function apexResponse(request, url, env, ctx) {
   if (url.pathname === "/globe.js") return new Response(GLOBE_JS, { headers: { "content-type": "application/javascript; charset=utf-8", "cache-control": "no-cache", ...SECURITY_HEADERS } });
   if (url.pathname === "/watch/sentinels.json") return json(SENTINELS);
   if (url.pathname === "/watch/coast.json") return new Response(JSON.stringify(COAST), { headers: { "content-type": "application/json", "cache-control": "public, max-age=86400", ...SECURITY_HEADERS } });
+  if (url.pathname === "/agents-index") { logPageView(env, ctx, request, url); return html(indexPage(await indexData(env))); }
+  if (url.pathname === "/agents-index.json") return new Response(JSON.stringify(await indexData(env)), { headers: { "content-type": "application/json", "cache-control": "no-store", "access-control-allow-origin": "*", ...SECURITY_HEADERS } });
+  if (url.pathname === "/agents-index.css") return new Response(INDEX_CSS, { headers: { "content-type": "text/css; charset=utf-8", "cache-control": "no-cache", ...SECURITY_HEADERS } });
   if (url.pathname === "/api/hit") return handleHit(request, env, ctx);
   if (url.pathname === "/api/early-access") return handleEarlyAccess(request, env, ctx);
   if (url.pathname === "/a.js") return new Response(ANALYTICS_JS, { headers: { "content-type": "application/javascript; charset=utf-8", "cache-control": "public, max-age=3600", ...SECURITY_HEADERS } });

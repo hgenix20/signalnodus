@@ -8,11 +8,14 @@
 
 const EMAIL = /^[^\s@<>"',;]{1,64}@[a-z0-9.-]{1,190}\.[a-z]{2,24}$/i;
 const PER_DAY = 5;
+const USES = new Set(["evidence", "control", "injection", "security", "curious", "other"]);
 
 let ready = false;
 async function ensureTable(env) {
   if (ready) return;
-  await env.BILLING.prepare("CREATE TABLE IF NOT EXISTS waitlist (id INTEGER PRIMARY KEY AUTOINCREMENT, ts TEXT NOT NULL, day TEXT NOT NULL, email TEXT NOT NULL, what TEXT, source TEXT, vid TEXT, UNIQUE(email, what))").run();
+  await env.BILLING.prepare("CREATE TABLE IF NOT EXISTS waitlist (id INTEGER PRIMARY KEY AUTOINCREMENT, ts TEXT NOT NULL, day TEXT NOT NULL, email TEXT NOT NULL, what TEXT, source TEXT, vid TEXT, use TEXT, UNIQUE(email, what))").run();
+  // Tables made before the use-case question have no column for it; adding it twice is an error we ignore.
+  await env.BILLING.prepare("ALTER TABLE waitlist ADD COLUMN use TEXT").run().catch(() => {});
   ready = true;
 }
 
@@ -49,8 +52,8 @@ export async function handleEarlyAccess(request, env, ctx) {
     await ensureTable(env);
     const n = await env.BILLING.prepare("SELECT COUNT(*) AS n FROM waitlist WHERE day = ? AND vid = ?").bind(day, vid).first();
     if ((n?.n || 0) >= PER_DAY) return;
-    await env.BILLING.prepare("INSERT OR IGNORE INTO waitlist (ts, day, email, what, source, vid) VALUES (?, ?, ?, ?, ?, ?)")
-      .bind(now.toISOString(), day, clip(body.email, 254).toLowerCase(), "canary-kit", clip(body.source, 80) || null, vid).run();
+    await env.BILLING.prepare("INSERT OR IGNORE INTO waitlist (ts, day, email, what, source, vid, use) VALUES (?, ?, ?, ?, ?, ?, ?)")
+      .bind(now.toISOString(), day, clip(body.email, 254).toLowerCase(), "canary-kit", clip(body.source, 80) || null, vid, USES.has(body.use) ? body.use : null).run();
   })().catch(() => {});
   if (ctx?.waitUntil) ctx.waitUntil(work); else await work;
   return ok;
@@ -58,6 +61,6 @@ export async function handleEarlyAccess(request, env, ctx) {
 
 export async function waitlistRows(env, since) {
   await ensureTable(env);
-  const r = await env.BILLING.prepare("SELECT id, ts, email, what, source FROM waitlist WHERE ts > ? ORDER BY id").bind(since || "1970").all();
+  const r = await env.BILLING.prepare("SELECT id, ts, email, what, source, use FROM waitlist WHERE ts > ? ORDER BY id").bind(since || "1970").all();
   return r.results || [];
 }

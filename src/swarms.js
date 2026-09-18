@@ -152,7 +152,8 @@ export function swarmsPage() {
     <section class="swarm-panel" data-swarm-panel aria-live="polite" tabindex="-1"><p class="dim">Click a tile to see what happened there.</p></section>
     <section class="swarm-cta" aria-labelledby="ea-h"><h2 id="ea-h">Put canaries on your own site.</h2>
     <p class="dim">The same bait runs on this site: a note only an AI agent reads and a link only a scraper follows. The canary kit puts it on yours and shows you which agents read your pages, which obey instructions hidden in them, and which networks they come from. We're taking a small group of early sites first.</p>
-    <form class="swarm-form" data-early-access novalidate><label for="ea-email">Work email</label><div class="row"><input id="ea-email" name="email" type="email" autocomplete="email" required placeholder="you@company.com"><button type="submit">Get early access</button></div>
+    <form class="swarm-form" data-early-access novalidate><label for="ea-use">What would you do with it?</label><select id="ea-use" name="use"><option value="">Choose one</option><option value="evidence">Evidence for licensing or legal</option><option value="control">Decide which agents to block or allow</option><option value="injection">Check our prompt-injection exposure</option><option value="security">Feed our security team</option><option value="curious">Just curious</option><option value="other">Something else</option></select>
+    <label for="ea-email">Work email</label><div class="row"><input id="ea-email" name="email" type="email" autocomplete="email" required placeholder="you@company.com"><button type="submit">Get early access</button></div>
     <div class="hp" aria-hidden="true"><label for="ea-website">Website</label><input id="ea-website" name="website" tabindex="-1" autocomplete="off"></div>
     <p class="dim small" data-ea-msg role="status">We'll only use this to write to you about the canary kit.</p></form></section>
     <p class="dim mw44">How detection works: each page on this site carries a note addressed to AI agents and a link no person can see. A person never reaches either. We record the time, the page, the user agent and the network the request came from, and never the IP address. Logos are shown only to name the platform; they belong to their owners.</p>
@@ -195,6 +196,7 @@ export const SWARM_CSS = `
 .swarm-cta h2{margin:0 0 .5rem}
 .swarm-form label{display:block;font-size:.85em;margin:.75rem 0 .35rem}
 .swarm-form .row{display:flex;gap:.5rem;flex-wrap:wrap}
+.swarm-form select{width:100%;max-width:24rem;padding:.6rem .7rem;border-radius:8px;border:1px solid #2a3346;background:#0b0e14;color:inherit;font:inherit}
 .swarm-form input{flex:1 1 16rem;min-width:0;padding:.7rem .8rem;border-radius:8px;border:1px solid #2a3346;background:#0b0e14;color:inherit;font:inherit}
 .swarm-form button{padding:.7rem 1.1rem;border-radius:8px;border:0;background:#f7768e;color:#0b0e14;font:inherit;font-weight:600;cursor:pointer}
 .swarm-form button[disabled]{opacity:.6;cursor:default}
@@ -273,7 +275,7 @@ export const SWARM_JS = String.raw`
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { msg.textContent = "That doesn't look like an email address."; form.email.focus(); return; }
     btn.disabled = true; msg.textContent = "Sending...";
     const q = new URLSearchParams(location.search);
-    fetch("/api/early-access", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email, website: form.website.value, elapsed: Math.round(performance.now() - loaded), source: [q.get("utm_source"), q.get("utm_campaign")].filter(Boolean).join("/") || document.referrer.slice(0, 80) }) })
+    fetch("/api/early-access", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email, use: form.use.value, website: form.website.value, elapsed: Math.round(performance.now() - loaded), source: [q.get("utm_source"), q.get("utm_campaign")].filter(Boolean).join("/") || document.referrer.slice(0, 80) }) })
       .then(r => r.json()).then(d => { msg.textContent = d.message || d.error || "Thanks."; if (d.ok) { form.email.value = ""; btn.textContent = "You're on the list"; } else btn.disabled = false; })
       .catch(() => { msg.textContent = "That didn't go through. Please try again."; btn.disabled = false; });
   });
