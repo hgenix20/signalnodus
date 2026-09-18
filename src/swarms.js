@@ -150,6 +150,11 @@ export function swarmsPage() {
     <ul class="swarm-legend"><li class="detected">detected</li><li class="watching">watching</li><li class="planned">planned</li></ul>
     <div class="swarm-stage" data-swarm-stage><ul class="swarm-tiles" data-swarm-tiles aria-label="Platforms and networks"></ul></div>
     <section class="swarm-panel" data-swarm-panel aria-live="polite" tabindex="-1"><p class="dim">Click a tile to see what happened there.</p></section>
+    <section class="swarm-cta" aria-labelledby="ea-h"><h2 id="ea-h">Put canaries on your own site.</h2>
+    <p class="dim">The same bait runs on this site: a note only an AI agent reads and a link only a scraper follows. The canary kit puts it on yours and shows you which agents read your pages, which obey instructions hidden in them, and which networks they come from. We're taking a small group of early sites first.</p>
+    <form class="swarm-form" data-early-access novalidate><label for="ea-email">Work email</label><div class="row"><input id="ea-email" name="email" type="email" autocomplete="email" required placeholder="you@company.com"><button type="submit">Get early access</button></div>
+    <div class="hp" aria-hidden="true"><label for="ea-website">Website</label><input id="ea-website" name="website" tabindex="-1" autocomplete="off"></div>
+    <p class="dim small" data-ea-msg role="status">We'll only use this to write to you about the canary kit.</p></form></section>
     <p class="dim mw44">How detection works: each page on this site carries a note addressed to AI agents and a link no person can see. A person never reaches either. We record the time, the page, the user agent and the network the request came from, and never the IP address. Logos are shown only to name the platform; they belong to their owners.</p>
   </div></section></main>
 <script src="/swarm-map.js" defer></script>`;
@@ -186,6 +191,15 @@ export const SWARM_CSS = `
 .swarm-legend{list-style:none;padding:0;display:flex;flex-wrap:wrap;gap:.5rem 1.25rem}
 .swarm-legend li::before,.st::before{content:"";display:inline-block;width:.6em;height:.6em;border-radius:50%;margin-right:.35em;vertical-align:middle}
 .watching::before,.st.watching::before{background:#7aa2f7}.planned::before,.st.planned::before{background:#8a93a6}.detected::before,.st.detected::before{background:#f7768e}
+.swarm-cta{border:1px solid #2a3346;border-radius:12px;padding:1.5rem;margin:1rem auto 2rem;max-width:56rem}
+.swarm-cta h2{margin:0 0 .5rem}
+.swarm-form label{display:block;font-size:.85em;margin:.75rem 0 .35rem}
+.swarm-form .row{display:flex;gap:.5rem;flex-wrap:wrap}
+.swarm-form input{flex:1 1 16rem;min-width:0;padding:.7rem .8rem;border-radius:8px;border:1px solid #2a3346;background:#0b0e14;color:inherit;font:inherit}
+.swarm-form button{padding:.7rem 1.1rem;border-radius:8px;border:0;background:#f7768e;color:#0b0e14;font:inherit;font-weight:600;cursor:pointer}
+.swarm-form button[disabled]{opacity:.6;cursor:default}
+.swarm-form .hp{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden}
+.swarm-form .small{font-size:.85em;margin-top:.6rem}
 @media (prefers-reduced-motion:reduce){.swarm-tiles,.swarm-tile{transition:none}}
 @media (max-width:560px){.swarm-tiles{--rx:14deg;--ry:0deg;grid-template-columns:repeat(3,1fr);gap:.6rem}.swarm-stage{padding:1rem 0 1.5rem}}
 `;
@@ -252,6 +266,17 @@ export const SWARM_JS = String.raw`
     requestAnimationFrame(sway);
   }
   apply(); requestAnimationFrame(sway);
+  const form = document.querySelector("[data-early-access]"), loaded = performance.now();
+  if (form) form.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const msg = form.querySelector("[data-ea-msg]"), btn = form.querySelector("button"), email = form.email.value.trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { msg.textContent = "That doesn't look like an email address."; form.email.focus(); return; }
+    btn.disabled = true; msg.textContent = "Sending...";
+    const q = new URLSearchParams(location.search);
+    fetch("/api/early-access", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email, website: form.website.value, elapsed: Math.round(performance.now() - loaded), source: [q.get("utm_source"), q.get("utm_campaign")].filter(Boolean).join("/") || document.referrer.slice(0, 80) }) })
+      .then(r => r.json()).then(d => { msg.textContent = d.message || d.error || "Thanks."; if (d.ok) { form.email.value = ""; btn.textContent = "You're on the list"; } else btn.disabled = false; })
+      .catch(() => { msg.textContent = "That didn't go through. Please try again."; btn.disabled = false; });
+  });
   fetch("/swarms.json").then(r => r.json()).then(render).catch(() => { panel.replaceChildren(el("p", "The list could not be loaded.", "dim")); });
 })();
 `;
