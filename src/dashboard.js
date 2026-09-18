@@ -25,7 +25,9 @@ export function isDashboardPath(pathname) {
     pathname === "/dashboard/traffic.json" ||
     pathname === "/dashboard/waitlist.json" ||
     pathname === "/dashboard/agents.json" ||
-    pathname === "/dashboard/traffic"
+    pathname === "/dashboard/traffic" ||
+    pathname === "/dashboard/magic" ||
+    pathname === "/dashboard/magic-new"
   );
 }
 
@@ -60,6 +62,31 @@ export async function handleDashboard(request, env, url) {
     });
   }
 
+  // One-time login links. The operator's box asks for a code with the token as a bearer header and
+  // sends Kameron the link over Telegram; the code works once, within 15 minutes, and becomes the
+  // same cookie a ?k= login sets. The permanent token never travels in a chat message.
+  if (url.pathname === "/dashboard/magic-new" && request.method === "POST") {
+    const bearer = /^Bearer\s+(.+)$/i.exec(request.headers.get("authorization") || "")?.[1]?.trim();
+    if (!sameToken(bearer, token) || !env.BILLING) return notFound();
+    await env.BILLING.prepare("CREATE TABLE IF NOT EXISTS dash_magic (code TEXT PRIMARY KEY, expires TEXT NOT NULL, used INTEGER NOT NULL DEFAULT 0)").run();
+    const code = [...crypto.getRandomValues(new Uint8Array(24))].map((b) => b.toString(16).padStart(2, "0")).join("");
+    await env.BILLING.prepare("INSERT INTO dash_magic (code, expires) VALUES (?, ?)").bind(code, new Date(Date.now() + 15 * 60000).toISOString()).run();
+    return Response.json({ link: `https://signalnodus.ai/dashboard/magic?m=${code}` }, { headers: { "cache-control": "no-store" } });
+  }
+  if (url.pathname === "/dashboard/magic") {
+    const m = url.searchParams.get("m") || "";
+    if (!/^[0-9a-f]{48}$/.test(m) || !env.BILLING) return notFound();
+    let row = null;
+    try {
+      row = await env.BILLING.prepare("UPDATE dash_magic SET used = 1 WHERE code = ? AND used = 0 AND expires > ? RETURNING code").bind(m, new Date().toISOString()).first();
+    } catch { row = null; }
+    if (!row) return new Response("This login link has expired or was already used. Ask the mind for a new one.", { status: 410, headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store" } });
+    const res = new Response(null, { status: 302, headers: { location: "/dashboard", "cache-control": "no-store", "referrer-policy": "no-referrer",
+      "set-cookie": `${COOKIE}=${token}; Path=/dashboard; Max-Age=2592000; HttpOnly; Secure; SameSite=Lax` } });
+    res.headers.append("set-cookie", ownerCookieHeader());
+    return res;
+  }
+
   // Handing the token in the query string once exchanges it for a cookie, so
   // it stops living in the address bar and in history.
   const supplied = url.searchParams.get("k");
@@ -69,7 +96,7 @@ export async function handleDashboard(request, env, url) {
       status: 302,
       headers: {
         location: "/dashboard",
-        "set-cookie": `${COOKIE}=${token}; Path=/dashboard; Max-Age=2592000; HttpOnly; Secure; SameSite=Strict`,
+        "set-cookie": `${COOKIE}=${token}; Path=/dashboard; Max-Age=2592000; HttpOnly; Secure; SameSite=Lax`,
       },
     });
     // Signing in also marks this browser as the owner's, so analytics never count it.
