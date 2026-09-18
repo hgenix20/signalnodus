@@ -12,6 +12,7 @@ import { dollars, PRICING, priceOf } from "./billing.js";
 import { x402Status } from "./mpp.js";
 import { ownerCookieHeader, trafficSummary } from "./analytics.js";
 import { waitlistRows } from "./waitlist.js";
+import { privateData } from "./agentindex.js";
 
 const COOKIE = "sn_dash";
 
@@ -22,7 +23,8 @@ export function isDashboardPath(pathname) {
     pathname === "/dashboard/deposit-address" ||
     pathname === "/dashboard/x402-check" ||
     pathname === "/dashboard/traffic.json" ||
-    pathname === "/dashboard/waitlist.json"
+    pathname === "/dashboard/waitlist.json" ||
+    pathname === "/dashboard/agents.json"
   );
 }
 
@@ -75,6 +77,12 @@ export async function handleDashboard(request, env, url) {
   }
 
   // The mind's box reads traffic with the same token as a bearer header; it never holds a cookie.
+  if (url.pathname === "/dashboard/agents.json") {
+    const bearer = /^Bearer\s+(.+)$/i.exec(request.headers.get("authorization") || "")?.[1]?.trim();
+    if (!sameToken(bearer, token) && !sameToken(cookieValue(request, COOKIE), token)) return notFound();
+    return Response.json(await privateData(env), { headers: { "cache-control": "no-store" } });
+  }
+
   if (url.pathname === "/dashboard/waitlist.json") {
     const bearer = /^Bearer\s+(.+)$/i.exec(request.headers.get("authorization") || "")?.[1]?.trim();
     if (!sameToken(bearer, token) && !sameToken(cookieValue(request, COOKIE), token)) return notFound();

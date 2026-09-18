@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { uaFamily, buildIndex, indexPage } from "../src/agentindex.js";
+import { uaFamily, buildIndex, indexPage, publicSummary } from "../src/agentindex.js";
 
 test("families come from the claimed user agent, most specific first", () => {
   assert.equal(uaFamily("Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; GPTBot/1.2; +https://openai.com/gptbot)").name, "GPTBot");
@@ -21,9 +21,18 @@ test("the index counts obeyed and trapped per family, ranks by obeyed", () => {
   assert.deepEqual(rows[1].networks, ["Microsoft"]);
 });
 
-test("the page escapes what requests claimed and says claims are not proof", () => {
-  const html = indexPage({ hits: 1, rows: buildIndex([{ ts: "2026-09-18T10:00:00Z", kind: "trap", page: "home", ua: "x", org: "<script>alert(1)</script>" }]) });
-  assert.ok(!html.includes("<script>alert(1)"));
-  assert.match(html, /not proof/);
-  assert.match(indexPage({ hits: 0, rows: [] }), /Nothing has taken the bait yet/);
+test("the public summary counts agents and categories, and the page names no claimed company", () => {
+  const hits = [
+    { ts: "2026-09-18T10:00:00Z", kind: "trap", page: "home", ua: "Mozilla/5.0 (compatible; GPTBot/1.2)", asn: 8075, org: "Microsoft" },
+    { ts: "2026-09-18T11:00:00Z", kind: "instruction", page: "home", ua: "Mozilla/5.0 (iPhone)", asn: 132203, org: "Tencent" },
+    { ts: "2026-09-18T11:10:00Z", kind: "trap", page: "home", ua: "Mozilla/5.0 (iPhone)", asn: 132203, org: "Tencent" },
+  ];
+  const d = publicSummary(hits);
+  assert.equal(d.agents_caught, 2);
+  assert.equal(d.obeyed, 1); assert.equal(d.trapped, 2);
+  assert.deepEqual(d.by_category.map((c) => c.category).sort(), ["Agents disguised as a person's browser", "Self-declared AI crawlers and assistants"]);
+  const html = indexPage(d);
+  assert.ok(!/GPTBot|Tencent|Microsoft/.test(html));
+  assert.match(html, /2<\/b><span>agents caught/);
+  assert.match(indexPage(publicSummary([])), /Nothing has taken the bait yet/);
 });

@@ -112,7 +112,7 @@ export function buildNodes(hits, now = new Date()) {
       byOrg.set(key, n);
     }
     if (n.lat == null && h.lat != null) { n.lat = h.lat; n.lon = h.lon; }
-    n.events.push({ ts: h.ts, kind: h.kind, page: h.page, ua: h.ua });
+    n.events.push({ ts: h.ts, kind: h.kind, page: h.page });
   }
   const out = [];
   for (const n of byOrg.values()) {
@@ -139,7 +139,8 @@ export async function swarmsData(env) {
       hits = r.results || [];
     } catch (e) { error = "canary store unavailable"; }
   }
-  return { updated: new Date().toISOString(), detected_days: DETECTED_DAYS, error, icons: BRAND_ICONS, nodes: [...WATCHED.map((w) => ({ ...w, events: [] })), ...buildNodes(hits)] };
+  const caught = new Set(hits.map((h) => `${h.asn || h.org || "?"}|${h.ua || ""}`)).size;
+  return { updated: new Date().toISOString(), detected_days: DETECTED_DAYS, error, agents_caught: caught, canary_hits: hits.length, icons: BRAND_ICONS, nodes: [...WATCHED.map((w) => ({ ...w, events: [] })), ...buildNodes(hits)] };
 }
 
 export function swarmsPage() {
@@ -147,6 +148,7 @@ export function swarmsPage() {
   <section class="chapter bt0" id="swarms" tabindex="-1"><div class="wrap">
     <div class="stack"><span class="eyebrow">where AI swarms have been reported, and where we watch</span><h1>The swarm watch.</h1>
     <p class="dim mw44">Each tile is a platform or network. Detected tiles stand tallest: our canaries caught automated agents from that network in the last ${DETECTED_DAYS} days. Watching means a sentinel of ours reads it now. Planned means swarms have been reported there and the watcher is still to be built. Drag the grid to tilt it; click a tile and its story opens below.</p></div>
+    <p class="swarm-caught" data-swarm-caught hidden><b data-caught-n>0</b> agents caught by our canaries so far. <a href="/agents-index">See the index</a></p>
     <ul class="swarm-legend"><li class="detected">detected</li><li class="watching">watching</li><li class="planned">planned</li></ul>
     <div class="swarm-stage" data-swarm-stage><ul class="swarm-tiles" data-swarm-tiles aria-label="Platforms and networks"></ul></div>
     <section class="swarm-panel" data-swarm-panel aria-live="polite" tabindex="-1"><p class="dim">Click a tile to see what happened there.</p></section>
@@ -189,6 +191,8 @@ export const SWARM_CSS = `
 .swarm-panel .head .swarm-logo{margin:0;flex:none}
 .swarm-panel h3{margin:0}
 .swarm-panel ol{padding-left:1.1rem;font-size:.9em}
+.swarm-caught{font-size:1.05em;margin:.5rem 0 1rem}
+.swarm-caught b{color:#f7768e;font-size:1.6em;font-variant-numeric:tabular-nums;margin-right:.2rem}
 .swarm-legend{list-style:none;padding:0;display:flex;flex-wrap:wrap;gap:.5rem 1.25rem}
 .swarm-legend li::before,.st::before{content:"";display:inline-block;width:.6em;height:.6em;border-radius:50%;margin-right:.35em;vertical-align:middle}
 .watching::before,.st.watching::before{background:#7aa2f7}.planned::before,.st.planned::before{background:#8a93a6}.detected::before,.st.detected::before{background:#f7768e}
@@ -234,13 +238,15 @@ export const SWARM_JS = String.raw`
     if (n.last_detected) panel.append(el("p", "Last detected " + n.last_detected.slice(0, 16).replace("T", " ") + " UTC"));
     if (n.events && n.events.length) {
       const ol = el("ol");
-      for (const e of n.events) ol.append(el("li", e.ts.slice(0, 16).replace("T", " ") + " · " + (e.kind === "instruction" ? "obeyed the hidden instruction" : "followed the trap link") + " on /" + (e.page === "home" ? "" : e.page.replace(/_/g, "/")) + " · " + (e.ua || "")));
+      for (const e of n.events) ol.append(el("li", e.ts.slice(0, 16).replace("T", " ") + " · " + (e.kind === "instruction" ? "obeyed the hidden instruction" : "followed the trap link") + " on /" + (e.page === "home" ? "" : e.page.replace(/_/g, "/"))));
       panel.append(ol);
     }
     const r = panel.getBoundingClientRect();
     if (r.top > innerHeight - 80 || r.bottom < 0) panel.scrollIntoView({ behavior: reduced ? "auto" : "smooth", block: "nearest" });
   }
   function render(d) {
+    const cw = document.querySelector("[data-swarm-caught]");
+    if (cw && typeof d.agents_caught === "number") { cw.querySelector("[data-caught-n]").textContent = d.agents_caught; cw.hidden = false; }
     const order = { detected: 0, watching: 1, planned: 2 }; icons = d.icons || {};
     grid.replaceChildren(); tiles = [];
     for (const n of (d.nodes || []).slice().sort((a, b) => order[a.status] - order[b.status])) {

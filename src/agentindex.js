@@ -36,6 +36,36 @@ const FAMILIES = [
   [/Mozilla\//i, "Claims to be a normal browser", "a user agent that looks like a person's browser; a person never reaches a canary, so this is an agent in disguise"],
 ];
 
+const AI_FAMILIES = new Set(["GPTBot", "ChatGPT-User", "OAI-SearchBot", "ClaudeBot", "Claude-User", "Claude-SearchBot", "anthropic-ai", "Perplexity-User", "PerplexityBot", "Google AI crawler", "Bytespider", "CCBot", "Amazonbot", "Meta crawler", "DuckAssistBot", "cohere-ai", "Diffbot", "Applebot"]);
+
+// The public page shows only these categories; which company a request claimed stays private.
+export function category(family) {
+  if (AI_FAMILIES.has(family)) return "Self-declared AI crawlers and assistants";
+  if (family === "Googlebot" || family === "Bingbot") return "Search engine crawlers";
+  if (family === "Claims to be a normal browser") return "Agents disguised as a person's browser";
+  if (["Headless browser", "Python HTTP client", "curl", "Go HTTP client", "Node.js HTTP client"].includes(family)) return "Scripts and automated browsers";
+  return "Other and unidentified";
+}
+
+// Counts for the public: agents caught (distinct network and user agent), hits, and hits by category.
+export function publicSummary(hits) {
+  const agents = new Set(), cats = new Map();
+  let obeyed = 0, trapped = 0, first = null, last = null;
+  for (const h of hits) {
+    agents.add(`${h.asn || h.org || "?"}|${h.ua || ""}`);
+    if (h.kind === "instruction") obeyed++; else trapped++;
+    const c = category(uaFamily(h.ua).name);
+    const r = cats.get(c) || { category: c, obeyed: 0, trapped: 0, agents: new Set() };
+    if (h.kind === "instruction") r.obeyed++; else r.trapped++;
+    r.agents.add(`${h.asn || h.org || "?"}|${h.ua || ""}`);
+    cats.set(c, r);
+    if (!first || h.ts < first) first = h.ts;
+    if (!last || h.ts > last) last = h.ts;
+  }
+  return { agents_caught: agents.size, hits: hits.length, obeyed, trapped, first, last,
+    by_category: [...cats.values()].map((r) => ({ category: r.category, agents: r.agents.size, obeyed: r.obeyed, trapped: r.trapped })).sort((a, b) => b.agents - a.agents) };
+}
+
 export function uaFamily(ua) {
   const s = String(ua || "");
   for (const [re, name, note] of FAMILIES) if (re.test(s)) return { name, note };
@@ -62,36 +92,49 @@ export function buildIndex(hits) {
     .sort((a, b) => b.obeyed - a.obeyed || b.trapped - a.trapped || a.family.localeCompare(b.family));
 }
 
-export async function indexData(env) {
-  let hits = [];
-  if (env?.BILLING) {
-    try {
-      const r = await env.BILLING.prepare("SELECT ts, kind, page, ua, org FROM canary_hits ORDER BY id DESC LIMIT 5000").all();
-      hits = r.results || [];
-    } catch { hits = []; }
-  }
-  return { updated: new Date().toISOString(), hits: hits.length, rows: buildIndex(hits) };
+async function allHits(env) {
+  if (!env?.BILLING) return [];
+  try {
+    const r = await env.BILLING.prepare("SELECT ts, kind, page, ua, asn, org, country, city FROM canary_hits ORDER BY id DESC LIMIT 5000").all();
+    return r.results || [];
+  } catch { return []; }
+}
+
+// Public: counts only.
+export async function publicData(env) {
+  return { updated: new Date().toISOString(), ...publicSummary(await allHits(env)) };
+}
+
+// Private (dashboard token): named rows and the recent raw hits.
+export async function privateData(env) {
+  const hits = await allHits(env);
+  return { updated: new Date().toISOString(), ...publicSummary(hits), rows: buildIndex(hits), recent: hits.slice(0, 200) };
 }
 
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
-export function indexPage(data) {
-  const body = data.rows.length
-    ? data.rows.map((r) => `<tr><th scope="row">${esc(r.family)}<span class="dim small">${esc(r.note)}</span></th><td class="num">${r.obeyed}</td><td class="num">${r.trapped}</td><td>${esc(r.networks.join(", "))}${r.network_count > 3 ? ` <span class="dim">+${r.network_count - 3} more</span>` : ""}</td><td class="dim">${esc(r.first.slice(0, 10))} to ${esc(r.last.slice(0, 10))}</td></tr>`).join("")
-    : `<tr><td colspan="5" class="dim">Nothing has taken the bait yet.</td></tr>`;
+export function indexPage(d) {
+  const cats = d.by_category.length
+    ? d.by_category.map((r) => `<tr><th scope="row">${esc(r.category)}</th><td class="num">${r.agents}</td><td class="num">${r.obeyed}</td><td class="num">${r.trapped}</td></tr>`).join("")
+    : `<tr><td colspan="4" class="dim">Nothing has taken the bait yet.</td></tr>`;
   const inner = `<main>
   <section class="chapter bt0" id="agent-index" tabindex="-1"><div class="wrap">
     <div class="stack"><span class="eyebrow">live from the canaries on this site</span><h1>The Agent Obedience Index.</h1>
-    <p class="dim mw44">Every page here carries a note that only software reads, asking it to fetch a URL, and a link no person can see that robots.txt forbids. A person never reaches either. This table counts what reached them, grouped by the agent each request claimed to be. ${data.hits} hits so far.</p></div>
-    <div class="idx-wrap"><table class="idx"><thead><tr><th scope="col">Claimed agent</th><th scope="col" class="num">Obeyed the hidden instruction</th><th scope="col" class="num">Followed the forbidden link</th><th scope="col">Networks it came from</th><th scope="col">Seen</th></tr></thead><tbody>${body}</tbody></table></div>
-    <p class="dim mw44">How to read this: a row is what requests <em>claimed</em> to be, from their user agent, and the networks Cloudflare placed them on. User agents can be forged, so a row is not proof that the named company sent the request; "claims to be a normal browser" is software that disguised itself. We store no IP addresses. Updated live.</p>
-    <p><a class="cta" href="/swarms#ea-h">Put the same canaries on your site</a> <a class="cta ghost" href="/agents-index.json">The data as JSON</a></p>
+    <p class="dim mw44">Every page here carries a note that only software reads, asking it to fetch a URL, and a link no person can see that robots.txt forbids. A person never reaches either, so everything that does is an automated agent.</p></div>
+    <div class="idx-stats"><div><b>${d.agents_caught}</b><span>agents caught</span></div><div><b>${d.obeyed}</b><span>obeyed a hidden instruction</span></div><div><b>${d.trapped}</b><span>followed a forbidden link</span></div></div>
+    <div class="idx-wrap"><table class="idx"><thead><tr><th scope="col">What they claimed to be</th><th scope="col" class="num">Agents</th><th scope="col" class="num">Obeyed</th><th scope="col" class="num">Forbidden link</th></tr></thead><tbody>${cats}</tbody></table></div>
+    <p class="dim mw44">An agent is one network and user agent pair. Categories come from what each request claimed; user agents can be forged, which is why we publish categories and not names. The named breakdown, by claimed agent and network, is available to customers and partners. ${d.first ? `Counting since ${esc(d.first.slice(0, 10))}.` : ""}</p>
+    <p><a class="cta" href="/swarms#ea-h">Put the same canaries on your site</a></p>
   </div></section></main>`;
-  return shell2("Agent Obedience Index · Signal Nodus", inner, { current: "/agents-index", canonical: "https://signalnodus.ai/agents-index", description: "Which AI agents and crawlers obey hidden instructions and ignore robots.txt, counted live from canaries on signalnodus.ai." })
+  return shell2("Agent Obedience Index · Signal Nodus", inner, { current: "/agents-index", canonical: "https://signalnodus.ai/agents-index", description: "How many AI agents obey hidden instructions and ignore robots.txt, counted live from canaries on signalnodus.ai." })
     .replace("</head>", '<link rel="stylesheet" href="/agents-index.css">\n</head>');
 }
 
 export const INDEX_CSS = `
+.idx-stats{display:flex;flex-wrap:wrap;gap:1rem;margin:1.5rem 0}
+.idx-stats div{flex:1 1 10rem;border:1px solid #2a3346;border-radius:10px;padding:1rem}
+.idx-stats b{display:block;font-size:2.2rem;line-height:1.1;color:#f7768e;font-variant-numeric:tabular-nums}
+.idx-stats span{font-size:.9em;color:#8a93a6}
 .idx-wrap{overflow-x:auto;margin:1.5rem 0;border:1px solid #2a3346;border-radius:10px}
 .idx{border-collapse:collapse;width:100%;min-width:40rem;font-size:.95em}
 .idx th,.idx td{padding:.65rem .8rem;border-bottom:1px solid #1c2433;text-align:left;vertical-align:top}
