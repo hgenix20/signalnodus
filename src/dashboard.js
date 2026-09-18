@@ -10,6 +10,7 @@
 
 import { dollars, PRICING, priceOf } from "./billing.js";
 import { x402Status } from "./mpp.js";
+import { ownerCookieHeader, trafficSummary } from "./analytics.js";
 
 const COOKIE = "sn_dash";
 
@@ -18,7 +19,8 @@ export function isDashboardPath(pathname) {
     pathname === "/dashboard" ||
     pathname === "/dashboard/logout" ||
     pathname === "/dashboard/deposit-address" ||
-    pathname === "/dashboard/x402-check"
+    pathname === "/dashboard/x402-check" ||
+    pathname === "/dashboard/traffic.json"
   );
 }
 
@@ -58,13 +60,24 @@ export async function handleDashboard(request, env, url) {
   const supplied = url.searchParams.get("k");
   if (supplied) {
     if (!sameToken(supplied, token)) return notFound();
-    return new Response(null, {
+    const res = new Response(null, {
       status: 302,
       headers: {
         location: "/dashboard",
         "set-cookie": `${COOKIE}=${token}; Path=/dashboard; Max-Age=2592000; HttpOnly; Secure; SameSite=Strict`,
       },
     });
+    // Signing in also marks this browser as the owner's, so analytics never count it.
+    res.headers.append("set-cookie", ownerCookieHeader());
+    return res;
+  }
+
+  // The mind's box reads traffic with the same token as a bearer header; it never holds a cookie.
+  if (url.pathname === "/dashboard/traffic.json") {
+    const bearer = /^Bearer\s+(.+)$/i.exec(request.headers.get("authorization") || "")?.[1]?.trim();
+    if (!sameToken(bearer, token) && !sameToken(cookieValue(request, COOKIE), token)) return notFound();
+    const days = Math.max(1, Math.min(90, Number(url.searchParams.get("days")) || 30));
+    return Response.json(await trafficSummary(env, days), { headers: { "cache-control": "no-store" } });
   }
 
   if (!sameToken(cookieValue(request, COOKIE), token)) return notFound();

@@ -1,4 +1,5 @@
 import { homePage, reviewPage, watchPage, trustPage } from "./pages.js";
+import { handleHit, noCountResponse, ANALYTICS_JS } from "./analytics.js";
 import { handleCanary, swarmsPage, swarmsData, SWARM_JS, SWARM_CSS } from "./swarms.js";
 import { GLOBE_JS } from "./globe.js";
 import { homePage2, reviewPage2, watchPage2, trustPage2 } from "./pages2.js";
@@ -283,7 +284,7 @@ async function apexResponse(request, url, env, ctx) {
     return asset(`<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`, "application/xml");
   }
   if (url.pathname === "/robots.txt") {
-    return asset("User-agent: *\nAllow: /\nDisallow: /key\nDisallow: /dashboard\nDisallow: /legacy\nDisallow: /c/\nSitemap: https://signalnodus.ai/sitemap.xml\n", "text/plain");
+    return asset("User-agent: *\nAllow: /\nDisallow: /key\nDisallow: /dashboard\nDisallow: /legacy\nDisallow: /c/\nDisallow: /nocount\nSitemap: https://signalnodus.ai/sitemap.xml\n", "text/plain");
   }
   if (url.pathname === "/") { logPageView(env, ctx, request, url); return html(homePage2()); }
   if (url.pathname === "/review") { logPageView(env, ctx, request, url); return html(reviewPage2()); }
@@ -294,6 +295,9 @@ async function apexResponse(request, url, env, ctx) {
   if (url.pathname === "/globe.js") return new Response(GLOBE_JS, { headers: { "content-type": "application/javascript; charset=utf-8", "cache-control": "no-cache", ...SECURITY_HEADERS } });
   if (url.pathname === "/watch/sentinels.json") return json(SENTINELS);
   if (url.pathname === "/watch/coast.json") return new Response(JSON.stringify(COAST), { headers: { "content-type": "application/json", "cache-control": "public, max-age=86400", ...SECURITY_HEADERS } });
+  if (url.pathname === "/api/hit") return handleHit(request, env, ctx);
+  if (url.pathname === "/a.js") return new Response(ANALYTICS_JS, { headers: { "content-type": "application/javascript; charset=utf-8", "cache-control": "public, max-age=3600", ...SECURITY_HEADERS } });
+  if (url.pathname === "/nocount") return noCountResponse();
   if (url.pathname.startsWith("/c/")) return handleCanary(request, env, ctx, url);
   if (url.pathname === "/swarms") { logPageView(env, ctx, request, url); return html(swarmsPage()); }
   if (url.pathname === "/swarms.json") return new Response(JSON.stringify(await swarmsData(env)), { headers: { "content-type": "application/json", "cache-control": "no-store", ...SECURITY_HEADERS } });

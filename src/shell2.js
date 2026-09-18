@@ -85,6 +85,7 @@ ${railHtml}
 ${inner}
 <footer><div class="wrap">Signal Nodus · human-owned · <a href="/review">review</a> · <a href="/watch">the watch</a> · <a href="/gate">the gate</a> · <a href="/trust">trust</a> · <a href="/swarms">swarm watch</a> · <a href="/status">status</a> · <a href="/privacy">privacy</a> · <a href="/terms">terms</a></div>${canaryHtml(current)}</footer>
 <script src="/site2.js" defer></script>
+<script src="/a.js" defer></script>
 </body>
 </html>`;
 }
