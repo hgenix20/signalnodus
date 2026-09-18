@@ -1,6 +1,7 @@
 import { homePage, reviewPage, watchPage, trustPage } from "./pages.js";
 import { handleEarlyAccess } from "./waitlist.js";
 import { ogPng } from "./ogimage.js";
+import { TRAFFIC_CSS } from "./dashboard.js";
 import { handleRegister, handleSitePage, canaryPage, CANARY_JS, CANARY_CSS } from "./sites.js";
 import { indexPage, publicData, INDEX_CSS } from "./agentindex.js";
 import { handleHit, noCountResponse, ANALYTICS_JS } from "./analytics.js";
@@ -307,6 +308,7 @@ async function apexResponse(request, url, env, ctx) {
   if (url.pathname === "/a.js") return new Response(ANALYTICS_JS, { headers: { "content-type": "application/javascript; charset=utf-8", "cache-control": "public, max-age=3600", ...SECURITY_HEADERS } });
   if (url.pathname === "/nocount") return noCountResponse();
   if (url.pathname.startsWith("/c/")) return handleCanary(request, env, ctx, url);
+  if (url.pathname === "/dashboard-traffic.css") return new Response(TRAFFIC_CSS, { headers: { "content-type": "text/css; charset=utf-8", "cache-control": "no-cache", ...SECURITY_HEADERS } });
   if (url.pathname === "/og.png") return new Response(ogPng(), { headers: { "content-type": "image/png", "cache-control": "public, max-age=86400", ...SECURITY_HEADERS } });
   if (url.pathname === "/canary") { logPageView(env, ctx, request, url); return html(canaryPage()); }
   if (url.pathname === "/canary.js") return new Response(CANARY_JS, { headers: { "content-type": "application/javascript; charset=utf-8", "cache-control": "no-cache", ...SECURITY_HEADERS } });

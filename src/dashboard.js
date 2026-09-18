@@ -24,7 +24,8 @@ export function isDashboardPath(pathname) {
     pathname === "/dashboard/x402-check" ||
     pathname === "/dashboard/traffic.json" ||
     pathname === "/dashboard/waitlist.json" ||
-    pathname === "/dashboard/agents.json"
+    pathname === "/dashboard/agents.json" ||
+    pathname === "/dashboard/traffic"
   );
 }
 
@@ -97,6 +98,8 @@ export async function handleDashboard(request, env, url) {
   }
 
   if (!sameToken(cookieValue(request, COOKIE), token)) return notFound();
+
+  if (url.pathname === "/dashboard/traffic") return trafficPage(env, url);
 
   // Operator action: ask Stripe for an on-chain deposit address. Kept behind
   // the dashboard token because it touches the Stripe account, and read-only
@@ -581,7 +584,7 @@ function render({ money: m, usage, keys, health }) {
       : '<p class="dim">No keys issued.</p>'
   }
 
-  <p class="mt dim">Generated ${new Date().toISOString().replace("T", " ").slice(0, 16)} UTC · <a href="/dashboard/logout">sign out</a></p>
+  <p class="mt dim">Generated ${new Date().toISOString().replace("T", " ").slice(0, 16)} UTC · <a href="/dashboard/traffic">real-visitor traffic</a> · <a href="/dashboard/logout">sign out</a></p>
 </main>
 </body></html>`;
 }
@@ -589,3 +592,47 @@ function render({ money: m, usage, keys, health }) {
 function stat(label, value, note) {
   return `<div class="stat"><div class="stat-l">${label}</div><div class="stat-v">${value}</div><div class="stat-n">${note}</div></div>`;
 }
+
+
+// The traffic page: the same numbers traffic.json serves, laid out for a person.
+const escT = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+async function trafficPage(env, url) {
+  const days = Math.max(1, Math.min(90, Number(url.searchParams.get("days")) || 7));
+  const t = await trafficSummary(env, days);
+  let signups = 0, sites = 0, agents = 0;
+  try { signups = (await env.BILLING.prepare("SELECT COUNT(*) AS n FROM waitlist").first())?.n || 0; } catch {}
+  try { sites = (await env.BILLING.prepare("SELECT COUNT(*) AS n FROM sites").first())?.n || 0; } catch {}
+  try { agents = (await env.BILLING.prepare("SELECT COUNT(DISTINCT COALESCE(asn, org) || '|' || COALESCE(ua, '')) AS n FROM canary_hits").first())?.n || 0; } catch {}
+  const table = (title, rows, cols) => `<h2>${escT(title)}</h2>` + (rows.length
+    ? `<table><thead><tr>${cols.map(([, h]) => `<th>${escT(h)}</th>`).join("")}</tr></thead><tbody>${rows.map((r) => `<tr>${cols.map(([k]) => `<td>${escT(r[k])}</td>`).join("")}</tr>`).join("")}</tbody></table>`
+    : `<p class="dim">Nothing yet.</p>`);
+  const range = [1, 7, 30, 90].map((d) => d === days ? `<b>${d}d</b>` : `<a href="/dashboard/traffic?days=${d}">${d}d</a>`).join(" · ");
+  const body = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex, nofollow"><title>Traffic · Signal Nodus</title><link rel="stylesheet" href="/dashboard-traffic.css"></head><body><main>
+  <p><a href="/dashboard">&larr; Dashboard</a></p>
+  <h1>Real visitors</h1><p class="dim">${range}. ${escT(t.definition)}</p>
+  <div class="stats"><div><b>${t.visitor_days}</b><span>visitors (per day)</span></div><div><b>${t.qualified_views}</b><span>engaged views</span></div><div><b>${t.median_read_seconds ?? "n/a"}${t.median_read_seconds != null ? "s" : ""}</b><span>median read</span></div><div><b>${signups}</b><span>early-access sign-ups</span></div><div><b>${sites}</b><span>sites with a canary</span></div><div><b>${agents}</b><span>agents caught</span></div></div>
+  ${table("By day", t.by_day, [["day", "Day"], ["visitors", "Visitors"], ["views", "Views"]])}
+  ${table("Pages", t.by_path, [["path", "Page"], ["visitors", "Visitors"], ["views", "Views"]])}
+  ${table("Where they came from", t.by_referrer, [["ref", "Referrer"], ["visitors", "Visitors"]])}
+  ${table("Campaigns (utm)", t.by_campaign, [["utm_source", "Source"], ["utm_campaign", "Campaign"], ["visitors", "Visitors"]])}
+  ${table("Countries", t.by_country, [["country", "Country"], ["visitors", "Visitors"]])}
+  ${table("Filtered out (not counted)", t.filtered, [["reason", "Reason"], ["n", "Hits"]])}
+  <p class="dim">Links opened inside the X app usually arrive with no referrer and show as direct; the utm_source on a link is what attributes them.</p>
+  </main></body></html>`;
+  return new Response(body, { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "x-robots-tag": "noindex" } });
+}
+
+export const TRAFFIC_CSS = `
+body{margin:0;background:#0b0e14;color:#d7dce6;font:16px/1.5 Inter,system-ui,-apple-system,Segoe UI,sans-serif}
+main{max-width:56rem;margin:0 auto;padding:1.5rem 1rem 3rem}
+a{color:#7aa2f7}.dim{color:#8a93a6}
+h1{margin:.5rem 0}h2{margin:2rem 0 .5rem;font-size:1.1rem}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(9rem,1fr));gap:.75rem;margin:1rem 0}
+.stats div{border:1px solid #2a3346;border-radius:10px;padding:.8rem}
+.stats b{display:block;font-size:1.8rem;color:#fbbf24;font-variant-numeric:tabular-nums}
+.stats span{font-size:.85rem;color:#8a93a6}
+table{border-collapse:collapse;width:100%;font-size:.95rem}
+th,td{text-align:left;padding:.45rem .6rem;border-bottom:1px solid #1c2433}
+th{color:#8a93a6;font-weight:600;font-size:.8rem}
+`;
