@@ -5,6 +5,7 @@
 import { shell2 } from "./shell2.js";
 
 export const EFFECTIVE = "2026-09-17";
+export const PRIVACY_EFFECTIVE = "2026-09-18";
 const MAIL = '<a href="mailto:hgenix@agentmail.to">hgenix@agentmail.to</a>';
 const GATE_RAW = "https://raw.githubusercontent.com/hgenix20/signalnodus/main/gate/agent-gate.mjs";
 const GATE_SRC = "https://github.com/hgenix20/signalnodus/blob/main/gate/agent-gate.mjs";
@@ -15,14 +16,19 @@ export function privacyPage3() {
   const inner = `<main>
   <section class="chapter bt0" id="privacy" tabindex="-1"><div class="wrap">
     <div class="stack"><span class="eyebrow">privacy</span><h1>What is recorded, where it goes, and how to have it removed.</h1>
-      <p class="lede">Effective ${EFFECTIVE}. Signal Nodus is a human-owned service with no separate legal entity. The operator answers at ${MAIL}.</p>
+      <p class="lede">Effective ${PRIVACY_EFFECTIVE}. Signal Nodus is a human-owned service with no separate legal entity. The operator answers at ${MAIL}.</p>
       <p class="dim">The site and its API run on Cloudflare Workers with a Cloudflare D1 database, so Cloudflare handles every request as the hosting provider under its own terms.</p></div>
     <div class="stack-l">
       <h2>By activity</h2>
       <div class="scroll"><table class="rec">
         <tr><th>When you</th><th>We record</th><th>Kept</th></tr>
         ${row("view a page on signalnodus.ai", "your IP address, the first 60 characters of your user agent, the path, and the time; obvious bots are skipped", "IP and user agent are erased after 90 days by a daily job; the row survives only as a count")}
-        ${row("email us, including a request for a review", "your message, at our mail provider (AgentMail)", "until the matter is closed")}
+        ${row("read pages on signalnodus.ai for a few seconds", "our visitor count: the page, the host of the site that linked you, any utm tags in the link, your country, whether you are on a touch screen, and how long you read. You are counted by a hash of your IP address and user agent salted with the day, so the same visit counts once and cannot be linked across days; the IP address itself is not stored. Nothing is recorded if the page script does not run, if you leave within a few seconds, or if you come from a hosting network", "as counts, with no IP address and no cookie identifier")}
+    ${row("sign up for early access on the swarm page", "your email, the use you chose, where you came from, and the same daily visitor hash", "until you ask us to remove it; used only to write to you about the canary kit")}
+    ${row("register a site for a free canary at /canary ", "your email, your domain, a public site id and a secret key for your private page, and the daily visitor hash", "while your canary is active, or until you ask us to delete it")}
+    ${row("run an automated agent or crawler that requests one of our canary links, on our site or a customer's", "the user agent it sent, the network it came from (AS number and name), the city, country and approximate coordinates Cloudflare assigns, connection details (protocol, TLS version, Accept and Accept-Language headers, the Cloudflare location, round-trip time, and Cloudflare's bot score and connection fingerprint when present), the page, and the time. No IP address. A person browsing normally never reaches these links", "as the canary record. Public pages show only counts by category and country and never name a network or company; the site owner sees the hits on their own site in full")}
+    ${row("sign in to the operator dashboard", "two cookies: one that keeps the operator signed in for 30 days, and one that stops that browser from being counted as a visitor. Visiting /nocount sets the second on any browser", "30 days and 400 days")}
+    ${row("email us, including a request for a review", "your message, at our mail provider (AgentMail)", "until the matter is closed")}
         ${row("take part in an incident evidence review", "nothing under this page. An engagement runs under signed data terms, and the controls on <a href=\"/trust\">the trust page</a> apply: raw logs stay in a vault, names become tokens before anything else touches them, and every byte that leaves is logged and handed back with the pack", "as the signed terms say")}
         ${row("appear in a source the Watch reads", "the Watch reads public filings, notices and advisories, and our own servers. It keeps the public record it found and its source link. It does not look people up", "while the signal is open")}
         ${row("install the gate from <a href=\"/gate\">the gate page</a>", "nothing. It runs on your machine, writes its record to your disk, and sends nothing anywhere", "nothing kept")}

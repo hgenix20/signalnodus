@@ -189,7 +189,7 @@ export function swarmsPage() {
     <div class="hp" aria-hidden="true"><label for="ea-website">Website</label><input id="ea-website" name="website" tabindex="-1" autocomplete="off"></div>
     <p class="dim small" data-ea-msg role="status">We'll only use this to write to you about the canary kit.</p></form>
     <p class="swarm-free">Want to start now? <a class="cta" href="/canary">Get a free canary for your site</a></p></section>
-    <p class="dim mw44">How detection works: each page on this site carries a note addressed to AI agents and a link no person can see. A person never reaches either. We record the time, the page, the user agent and the network the request came from, and never the IP address. Logos are shown only to name the platform; they belong to their owners.</p>
+    <p class="dim mw44">How detection works: each page on this site carries a note addressed to AI agents and a link no person can see. A person never reaches either. We record the time, the page, the user agent and the network the request came from, and never the IP address. Logos are shown only to name the platform; they belong to their owners. Each "reported" line summarizes the third-party publication linked beside it and is not a finding of ours about that platform or anyone on it. Networks our canaries catch are shown by type and country, never by name.</p>
   </div></section></main>
 <script src="/swarm-map.js" defer></script>`;
   return shell2("Swarm watch · Signal Nodus", inner, { current: "/swarms", canonical: "https://signalnodus.ai/swarms", description: "The platforms where AI agent swarms have been reported, which ones Signal Nodus watches, and the networks its canaries have caught." })
