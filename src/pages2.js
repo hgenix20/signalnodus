@@ -43,7 +43,13 @@ function globeStage(withList) {
 ${withList ? '<ul data-sentinel-list aria-label="Sentinels"></ul>' : ""}`;
 }
 
-export function homePage2() {
+export function homePage2(live = {}) {
+  // `live.agents_caught` comes from the agents index at request time; the pill says what the
+  // number is (bait taken by something automated) and not more than that.
+  const n = Number(live.agents_caught || 0);
+  const pill = n > 0
+    ? `Our own site: ${n} automated visitor${n === 1 ? "" : "s"} have taken the canary's bait since 18 Sep 2026`
+    : `Our own site carries the canary first; the public index shows what it records`;
   const inner = `
 <main>
   <section class="hx" id="top" tabindex="-1"><div class="wrap">
@@ -52,7 +58,7 @@ export function homePage2() {
       <h1>Get your crawler controls checked, and configured.</h1>
       <p class="lede">A fixed-price service for independent publishers using Cloudflare. We review the request evidence your setup makes available, agree which automated traffic you want to allow or restrict, and implement a small set of approved changes. Practical configuration help, not another monitoring subscription.</p>
       <p class="row"><a class="cta" href="/qualify">Check whether your site qualifies</a><a class="cta ghost" href="/service">What you get for $350</a></p>
-      <a class="proofpill" href="/agents-index">Our own site: 6 automated visitors caught by the canary in its first two days</a>
+      <a class="proofpill" href="/agents-index">${pill}</a>
     </div>
     <div class="products">
       <a class="product canary" href="/service"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 3 6v6c0 5 3.8 9.4 9 10 5.2-.6 9-5 9-10V6z"/><path d="m9 12 2 2 4-4"/></svg></span><div><h3>Evidence review <span class="tag">What is known</span></h3><p>A concise account of observed crawler activity, including what cannot be reliably identified.</p></div></a>

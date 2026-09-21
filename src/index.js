@@ -292,7 +292,12 @@ async function apexResponse(request, url, env, ctx) {
   if (url.pathname === "/robots.txt") {
     return asset("User-agent: *\nAllow: /\nDisallow: /key\nDisallow: /dashboard\nDisallow: /legacy\nDisallow: /c/\nDisallow: /nocount\nDisallow: /site/\nSitemap: https://signalnodus.ai/sitemap.xml\n", "text/plain");
   }
-  if (url.pathname === "/") { logPageView(env, ctx, request, url); return html(homePage2()); }
+  if (url.pathname === "/") {
+    logPageView(env, ctx, request, url);
+    let live = {};
+    try { live = await publicData(env); } catch { live = {}; }
+    return html(homePage2(live));
+  }
   if (url.pathname === "/review") { logPageView(env, ctx, request, url); return html(reviewPage2()); }
   if (url.pathname === "/watch") { logPageView(env, ctx, request, url); return html(watchPage2()); }
   if (url.pathname === "/fonts.css") return new Response(FONTS_CSS, { headers: { "content-type": "text/css; charset=utf-8", "cache-control": "public, max-age=604800", ...SECURITY_HEADERS } });
