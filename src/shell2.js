@@ -112,7 +112,8 @@ footer { border-top-color: var(--line); color: var(--dim); font: 400 13px var(--
 `;
 export function shell2(title, inner, opts = {}) {
   const { canonical = "https://signalnodus.ai/", description = "", current = "/", index = true, rail = null } = opts;
-  const nav = [["/", "Home"], ["/review", "Review"], ["/gate", "The Gate"], ["/watch", "The Watch"], ["/swarms", "Swarms"], ["/trust", "Trust"]]
+  // The service leads; the review, the gate and swarms keep their URLs and live in the footer.
+  const nav = [["/", "Home"], ["/service", "The service"], ["/qualify", "Check fit"], ["/canary", "Free canary"], ["/watch", "The Watch"], ["/trust", "Trust"]]
     .map(([h, l]) => `<a href="${h}"${h === current ? ' aria-current="page"' : ""}>${l}</a>`).join("");
   const railHtml = rail ? `<nav class="rail" aria-label="Chapters">${rail.map(([id, l], i) => `<a href="#${id}" data-chapter="${id}" accesskey="${i + 1}">${String(i + 1).padStart(2, "0")} ${l}</a>`).join("")}</nav>` : "";
   return `<!doctype html>

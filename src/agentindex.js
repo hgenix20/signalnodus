@@ -34,7 +34,7 @@ const FAMILIES = [
   [/Go-http-client/i, "Go HTTP client", "a program, by its user agent"],
   [/node-fetch|undici|axios/i, "Node.js HTTP client", "a program, by its user agent"],
   [/bot|crawl|spider/i, "Other self-declared bot", "a user agent that calls itself a bot"],
-  [/Mozilla\//i, "Claims to be a normal browser", "a user agent that looks like a person's browser; a person never reaches a canary, so this is an agent in disguise"],
+  [/Mozilla\//i, "Claims to be a normal browser", "a user agent that looks like a person's browser reaching a link people never see; automated by construction, identity unverified"],
 ];
 
 const AI_FAMILIES = new Set(["GPTBot", "ChatGPT-User", "OAI-SearchBot", "ClaudeBot", "Claude-User", "Claude-SearchBot", "anthropic-ai", "Perplexity-User", "PerplexityBot", "Google AI crawler", "Bytespider", "CCBot", "Amazonbot", "Meta crawler", "DuckAssistBot", "cohere-ai", "Diffbot", "Applebot"]);
@@ -43,7 +43,7 @@ const AI_FAMILIES = new Set(["GPTBot", "ChatGPT-User", "OAI-SearchBot", "ClaudeB
 export function category(family) {
   if (AI_FAMILIES.has(family)) return "Self-declared AI crawlers and assistants";
   if (family === "Googlebot" || family === "Bingbot") return "Search engine crawlers";
-  if (family === "Claims to be a normal browser") return "Agents disguised as a person's browser";
+  if (family === "Claims to be a normal browser") return "Browser-like user agents on links people never see";
   if (["Headless browser", "Python HTTP client", "curl", "Go HTTP client", "Node.js HTTP client"].includes(family)) return "Scripts and automated browsers";
   return "Other and unidentified";
 }

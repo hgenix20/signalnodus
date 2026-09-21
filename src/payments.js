@@ -10,6 +10,7 @@
 // hash after Stripe confirms payment.
 
 import { hashKey, dollars, priceOf } from "./billing.js";
+import { SERVICE } from "./service.js";
 
 // Bonus credit on the larger packs is the volume discount. Compare against an
 // incumbent charging $239/mo before you may extract a section at all.
@@ -93,13 +94,41 @@ export async function createCheckout(request, env) {
     return json({ error: "payments_not_configured", detail: "STRIPE_SECRET_KEY is not set" }, 503);
   }
 
-  let packId;
+  let packId, qualifyRef;
   try {
     const raw = await request.text();
     if (raw.length > 4096) return json({ error: "body too large" }, 413);
-    ({ pack: packId } = JSON.parse(raw || "{}"));
+    ({ pack: packId, qualify_ref: qualifyRef } = JSON.parse(raw || "{}"));
   } catch {
     return json({ error: "bad request" }, 400);
+  }
+
+  // The crawler-control service is a one-off order, not a credit pack: no key is minted, the
+  // webhook records a service_orders row instead of crediting anything, and the operator
+  // confirms the Stripe event before work starts. The link is only ever sent after fit and scope
+  // are agreed in writing; the page never offers it cold.
+  if (String(packId) === SERVICE.id) {
+    const ref = /^q[0-9a-f]{8}$/.test(String(qualifyRef || "")) ? String(qualifyRef) : "";
+    let session;
+    try {
+      session = await stripe(env, "checkout/sessions", {
+        mode: "payment",
+        "line_items[0][price_data][currency]": "usd",
+        "line_items[0][price_data][unit_amount]": String(SERVICE.cents),
+        "line_items[0][price_data][product_data][name]": `Signal Nodus ${SERVICE.label}`,
+        "line_items[0][price_data][product_data][description]": SERVICE.description,
+        "line_items[0][quantity]": "1",
+        success_url: "https://signalnodus.ai/service/thanks",
+        cancel_url: "https://signalnodus.ai/service",
+        "metadata[kind]": "service",
+        "metadata[service]": SERVICE.id,
+        "metadata[qualify_ref]": ref,
+      });
+    } catch (err) {
+      console.error("service checkout failed", err);
+      return json({ error: "checkout unavailable" }, 502);
+    }
+    return json({ checkout_url: session.url, service: SERVICE.label, price: `$${(SERVICE.cents / 100).toFixed(2)}` });
   }
 
   const pack = PACKS[String(packId || "starter")];
@@ -226,6 +255,33 @@ export async function handleWebhook(request, env) {
   }
 
   const md = event.data?.object?.metadata || {};
+
+  // A service order: record it, never credit anything. Same at-least-once rule as credits,
+  // so the event id is the primary key and a redelivery is a no-op. The operator reads
+  // service_orders (and confirms in Stripe) before any work starts; the success page proves
+  // nothing on its own.
+  if (String(md.kind || "") === "service") {
+    const s = event.data?.object || {};
+    try {
+      await env.BILLING.prepare(
+        "CREATE TABLE IF NOT EXISTS service_orders (event_id TEXT PRIMARY KEY, session_id TEXT, service TEXT, qualify_ref TEXT, email TEXT, amount_total INTEGER, currency TEXT, payment_status TEXT, created TEXT NOT NULL)",
+      ).run();
+      const r = await env.BILLING.prepare(
+        "INSERT INTO service_orders (event_id, session_id, service, qualify_ref, email, amount_total, currency, payment_status, created) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(event_id) DO NOTHING",
+      )
+        .bind(
+          String(event.id || ""), String(s.id || ""), String(md.service || ""), String(md.qualify_ref || ""),
+          String(s.customer_details?.email || s.customer_email || ""), Number(s.amount_total || 0), String(s.currency || ""),
+          String(s.payment_status || ""), new Date().toISOString(),
+        )
+        .run();
+      return json({ received: true, service: true, duplicate: (r.meta?.changes ?? 1) === 0 });
+    } catch (err) {
+      console.error("could not record service order", err);
+      return json({ error: "could not record order" }, 500);
+    }
+  }
+
   const keyHash = String(md.key_hash || "");
   const units = Number(md.units || 0);
   if (!/^[a-f0-9]{64}$/.test(keyHash) || !Number.isFinite(units) || units <= 0) {

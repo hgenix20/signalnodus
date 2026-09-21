@@ -3,6 +3,7 @@ import { handleEarlyAccess } from "./waitlist.js";
 import { ogPng } from "./ogimage.js";
 import { TRAFFIC_CSS } from "./dashboard.js";
 import { handleRegister, handleSitePage, canaryPage, CANARY_JS, CANARY_CSS } from "./sites.js";
+import { servicePage, qualifyPage, thanksPage, handleQualify, listQualify, SERVICE_CSS, QUALIFY_JS } from "./service.js";
 import { indexPage, publicData, INDEX_CSS } from "./agentindex.js";
 import { handleHit, noCountResponse, ANALYTICS_JS } from "./analytics.js";
 import { handleCanary, swarmsPage, swarmsData, SWARM_JS, SWARM_CSS } from "./swarms.js";
@@ -314,6 +315,13 @@ async function apexResponse(request, url, env, ctx) {
   if (url.pathname === "/canary.js") return new Response(CANARY_JS, { headers: { "content-type": "application/javascript; charset=utf-8", "cache-control": "no-cache", ...SECURITY_HEADERS } });
   if (url.pathname === "/canary.css") return new Response(CANARY_CSS, { headers: { "content-type": "text/css; charset=utf-8", "cache-control": "no-cache", ...SECURITY_HEADERS } });
   if (url.pathname === "/api/sites") return handleRegister(request, env, ctx);
+  if (url.pathname === "/service") { logPageView(env, ctx, request, url); return html(servicePage()); }
+  if (url.pathname === "/service/thanks") { logPageView(env, ctx, request, url); return html(thanksPage()); }
+  if (url.pathname === "/qualify") { logPageView(env, ctx, request, url); return html(qualifyPage()); }
+  if (url.pathname === "/api/qualify") return handleQualify(request, env);
+  if (url.pathname === "/api/qualify/list") return listQualify(request, env);
+  if (url.pathname === "/service.css") return new Response(SERVICE_CSS, { headers: { "content-type": "text/css; charset=utf-8", "cache-control": "no-cache", ...SECURITY_HEADERS } });
+  if (url.pathname === "/qualify.js") return new Response(QUALIFY_JS, { headers: { "content-type": "application/javascript; charset=utf-8", "cache-control": "no-cache", ...SECURITY_HEADERS } });
   if (url.pathname.startsWith("/site/")) { const r = await handleSitePage(env, url); for (const [k, v] of Object.entries(SECURITY_HEADERS)) if (!r.headers.has(k)) r.headers.set(k, v); return r; }
   if (url.pathname === "/swarms") { logPageView(env, ctx, request, url); return html(swarmsPage()); }
   if (url.pathname === "/swarms.json") return new Response(JSON.stringify(await swarmsData(env)), { headers: { "content-type": "application/json", "cache-control": "no-store", ...SECURITY_HEADERS } });

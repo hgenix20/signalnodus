@@ -30,7 +30,7 @@ test("the public summary counts agents and categories, and the page names no cla
   const d = publicSummary(hits);
   assert.equal(d.agents_caught, 2);
   assert.equal(d.obeyed, 1); assert.equal(d.trapped, 2);
-  assert.deepEqual(d.by_category.map((c) => c.category).sort(), ["Agents disguised as a person's browser", "Self-declared AI crawlers and assistants"]);
+  assert.deepEqual(d.by_category.map((c) => c.category).sort(), ["Browser-like user agents on links people never see", "Self-declared AI crawlers and assistants"]);
   const html = indexPage(d);
   assert.ok(!/GPTBot|Tencent|Microsoft/.test(html));
   assert.match(html, /2<\/b><span>agents caught/);

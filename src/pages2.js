@@ -48,25 +48,33 @@ export function homePage2() {
 <main>
   <section class="hx" id="top" tabindex="-1"><div class="wrap">
     <div>
-      <span class="eyebrow">AI agent detection</span>
-      <h1>Catch the AI agents working your site.</h1>
-      <p class="lede">Canaries, sentinels and tripwires turn what agents do into alerts you can act on: which agent, from where, and whether it hid.</p>
-      <p class="row"><a class="cta" href="/canary">Get a free canary</a><a class="cta ghost" href="/agents-index">See what we've caught</a></p>
-      <a class="proofpill" href="/agents-index">First agent caught on 18 Sep 2026, disguised as an iPhone</a>
+      <span class="eyebrow">For independent publishers on Cloudflare</span>
+      <h1>Get your crawler controls checked, and configured.</h1>
+      <p class="lede">A fixed-price service for independent publishers using Cloudflare. We review the request evidence your setup makes available, agree which automated traffic you want to allow or restrict, and implement a small set of approved changes. Practical configuration help, not another monitoring subscription.</p>
+      <p class="row"><a class="cta" href="/qualify">Check whether your site qualifies</a><a class="cta ghost" href="/service">What you get for $350</a></p>
+      <a class="proofpill" href="/agents-index">Our own site: 6 automated visitors caught by the canary in its first two days</a>
     </div>
     <div class="products">
-      <a class="product canary" href="/canary"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 7h.01"/><path d="M3.4 18H12a8 8 0 0 0 8-8V7a4 4 0 0 0-7.28-2.3L2 20"/><path d="m20 7 2 .5-2 .5"/><path d="M10 18v3"/><path d="M14 17.75V21"/><path d="M7 18a6 6 0 0 0 3.84-10.61"/></svg></span><div><h3>Canaries <span class="tag">On your site</span></h3><p>Two invisible lines only an agent will act on. See who took the bait, from where, and whether a VPN hid it.</p></div></a>
-      <a class="product sentinel" href="/watch"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.07 4.93A10 10 0 0 0 6.99 3.34"/><path d="M4 6h.01"/><path d="M2.29 9.62A10 10 0 1 0 21.31 8.35"/><path d="M16.24 7.76A6 6 0 1 0 8.23 16.67"/><path d="M12 18h.01"/><path d="M17.99 11.66A6 6 0 0 1 15.77 16.67"/><circle cx="12" cy="12" r="2"/><path d="m13.41 10.59 5.66-5.66"/></svg></span><div><h3>Sentinels <span class="tag">Public records</span></h3><p>Incident filings, advisories and swarm reports, read on a schedule, every hit sourced.</p></div></a>
-      <a class="product tripwire" href="/swarms"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2"/></svg></span><div><h3>Tripwires <span class="tag">Live feeds</span></h3><p>Swarm patterns across Reddit, Bluesky, Mastodon, Hugging Face and RubyGems.</p></div></a>
+      <a class="product canary" href="/service"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 3 6v6c0 5 3.8 9.4 9 10 5.2-.6 9-5 9-10V6z"/><path d="m9 12 2 2 4-4"/></svg></span><div><h3>Evidence review <span class="tag">What is known</span></h3><p>A concise account of observed crawler activity, including what cannot be reliably identified.</p></div></a>
+      <a class="product sentinel" href="/service"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></span><div><h3>Approved changes <span class="tag">With rollback</span></h3><p>Supported Cloudflare settings adjusted to your publishing priorities, with a change log and rollback instructions.</p></div></a>
+      <a class="product tripwire" href="/service"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span><div><h3>Follow-up check <span class="tag">Verified</span></h3><p>Tests of the agreed controls and your key visitor paths, with remaining limitations documented.</p></div></a>
+    </div>
+  </div></section>
+
+  <section class="chapter" id="terms" tabindex="-1"><div class="wrap">
+    <div class="stack"><span class="eyebrow">The terms, in full</span><h2>$350 once. Fit confirmed before payment.</h2>
+      <p class="dim mw44">One site, up to four hours of work, delivered within 14 calendar days after agreed access is available. No subscription. Full refund if we cannot complete the written, agreed scope; completed work does not guarantee elimination of scraping.</p>
+      <p class="dim mw44"><strong>Eligibility:</strong> you control a publisher website on Cloudflare and can provide suitable evidence and narrowly scoped access. <strong>Not:</strong> comprehensive agent identification, legal evidence, emergency incident response, or a promise to stop every scraper.</p>
+      <p class="dim mw44">An AI assistant helps with intake and preparation; a human solutions architect approves and performs the configuration work.</p>
     </div>
   </div></section>
 
   <section class="chapter" id="how" tabindex="-1"><div class="wrap">
-    <div class="stack"><span class="eyebrow">How the canary works</span><h2>Five minutes to set up. Nothing for people to see.</h2></div>
+    <div class="stack"><span class="eyebrow">The free canary, the instrument we use ourselves</span><h2>Two lines that show you what automated visitors do on your pages.</h2><p class="dim mw44">Free, and optional. It is one piece of evidence for the review, not a comprehensive measure of agent traffic, and it is how we keep the record on our own site first. <a href="/canary">Put one on your site</a>.</p></div>
     <ol class="steps">
       <li><h3>Paste two lines</h3><p class="dim">A hidden note that asks an agent to fetch a URL, and a link robots.txt forbids. Readers never see either.</p></li>
-      <li><h3>Agents take the bait</h3><p class="dim">Anything that follows the note or the link is automated by construction, so every hit is a real agent.</p></li>
-      <li><h3>You see who</h3><p class="dim">Your private page shows the claimed agent, the network, the country, and whether it hid behind a VPN or a cloud server.</p></li>
+      <li><h3>Requests consistent with automated discovery</h3><p class="dim">A fetch of the forbidden link means something automated read the page. A fetch of the URL named in the hidden note is stronger: something followed an instruction a person never saw. Your page reports the two apart.</p></li>
+      <li><h3>You see what it claimed</h3><p class="dim">The user agent it presented, the network, the country, and whether it came through a VPN or a cloud range. A claimed identity is not a verified operator, and a cloud address is not proof of concealment; the page says so.</p></li>
     </ol>
   </div></section>
 

@@ -100,7 +100,7 @@ export async function handleSitePage(env, url) {
 export function canaryPage() {
   const inner = `<main><section class="chapter bt0" id="canary" tabindex="-1"><div class="wrap">
     <div class="stack"><span class="eyebrow">free · two lines of HTML</span><h1>Put a canary on your site.</h1>
-    <p class="dim mw44">Paste two invisible lines into your pages. People never see them. AI agents and scrapers do: one line asks an agent to fetch a URL, the other is a link that robots.txt forbids. Every time one takes the bait, your private page shows which agent it claimed to be, the network it came from, where, and whether it hid behind a VPN or a cloud server.</p></div>
+    <p class="dim mw44">Paste two invisible lines into your pages. People never see them; automated visitors do. One line asks an agent to fetch a URL, the other is a link that robots.txt forbids. Each fetch is a request consistent with automated discovery: the forbidden link means something automated read the page, the named URL means something followed an instruction no person saw, and your private page reports the two apart, with the user agent it claimed, the network, the country, and whether it came through a VPN or a cloud range. A claimed identity is not a verified operator, and a cloud address is not proof of concealment.</p></div>
     <form class="swarm-form canary-form" data-canary-form novalidate>
       <label for="cf-domain">Your site</label><input id="cf-domain" name="domain" placeholder="example.com" autocomplete="url" required>
       <label for="cf-email">Your email</label><div class="row"><input id="cf-email" name="email" type="email" autocomplete="email" placeholder="you@company.com" required><button type="submit">Get my snippet</button></div>
