@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { SERVICE, servicePage, qualifyPage, thanksPage, handleQualify, listQualify } from "../src/service.js";
+import { SERVICE, servicePage, qualifyPage, thanksPage, handleQualify, listQualify, approveQualify } from "../src/service.js";
 import { homePage2 } from "../src/pages2.js";
 
 test("the service is a one-off at $350 and says so", () => {
@@ -48,18 +48,51 @@ const good = {
 };
 
 function fakeDb() {
-  const rows = [];
+  // rows: [ref, created, email, site, answers]; status kept beside them
+  const rows = [], status = new Map();
+  const view = () => rows.map((r) => ({ ref: r[0], created: r[1], email: r[2], site: r[3], answers: r[4], status: status.get(r[0]) || "new" }));
   return {
-    rows,
+    rows, status,
     prepare(sql) {
       return {
-        bind(...args) { return { run: async () => { if (/INSERT INTO service_requests/.test(sql)) rows.push(args); return { meta: { changes: 1 } }; }, all: async () => ({ results: rows.map((r) => ({ ref: r[0], created: r[1], email: r[2], site: r[3], answers: r[4], status: "new" })) }) }; },
+        bind(...args) {
+          return {
+            run: async () => {
+              if (/INSERT INTO service_requests/.test(sql)) { rows.push(args); status.set(args[0], "new"); return { meta: { changes: 1 } }; }
+              if (/UPDATE service_requests SET status = 'approved'/.test(sql)) { const has = rows.some((r) => r[0] === args[0]); if (has) status.set(args[0], "approved"); return { meta: { changes: has ? 1 : 0 } }; }
+              return { meta: { changes: 1 } };
+            },
+            first: async () => {
+              if (/FROM service_requests WHERE ref = \? AND status = 'approved'/.test(sql)) { const r = view().find((x) => x.ref === args[0] && x.status === "approved"); return r ? { ref: r.ref, email: r.email } : null; }
+              return null;
+            },
+            all: async () => ({ results: view() }),
+          };
+        },
         run: async () => ({ meta: { changes: 0 } }),
-        all: async () => ({ results: rows.map((r) => ({ ref: r[0], created: r[1], email: r[2], site: r[3], answers: r[4], status: "new" })) }),
+        all: async () => ({ results: view() }),
       };
     },
   };
 }
+
+import { createCheckout } from "../src/payments.js";
+
+test("the $350 checkout refuses without an owner-approved intake, and approval is token-gated", async () => {
+  const env = { BILLING: fakeDb(), DASHBOARD_TOKEN: "t0k", STRIPE_SECRET_KEY: "sk_test_x" };
+  const submitted = await (await handleQualify(req(good), env)).json();
+  const checkout = (ref) => createCheckout(new Request("https://signalnodus.ai/api/checkout", { method: "POST", body: JSON.stringify({ pack: "crawler-service", qualify_ref: ref }) }), env);
+  assert.equal((await checkout(undefined)).status, 403);
+  assert.equal((await checkout(submitted.ref)).status, 403, "submitted but not approved");
+  const approve = (ref, token) => approveQualify(new Request("https://signalnodus.ai/api/qualify/approve", { method: "POST", headers: token ? { authorization: `Bearer ${token}` } : {}, body: JSON.stringify({ ref }) }), env);
+  assert.equal((await approve(submitted.ref, undefined)).status, 404);
+  assert.equal((await approve("q00000000", "t0k")).status, 404);
+  assert.equal((await approve(submitted.ref, "t0k")).status, 200);
+  assert.equal(env.BILLING.status.get(submitted.ref), "approved");
+  // Approved: the gate opens and the next step is the Stripe call, which this test does not make.
+  const r = await checkout(submitted.ref);
+  assert.notEqual(r.status, 403);
+});
 
 test("intake refuses bots, foreign origins and junk, and stores a good submission", async () => {
   const env = { BILLING: fakeDb(), DASHBOARD_TOKEN: "t0k" };

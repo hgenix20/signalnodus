@@ -166,6 +166,23 @@ export async function handleQualify(request, env) {
   return Response.json({ ok: true, ref });
 }
 
+// POST /api/qualify/approve {ref}: the owner marks an intake approved after fit and scope are
+// agreed in writing. Only an approved ref can open the $350 checkout (payments.js). Bearer
+// DASHBOARD_TOKEN; by policy the executive never calls this, the owner does.
+export async function approveQualify(request, env) {
+  if (request.method !== "POST") return Response.json({ error: "method not allowed" }, { status: 405 });
+  const bearer = /^Bearer\s+(.+)$/i.exec(request.headers.get("authorization") || "")?.[1]?.trim();
+  if (!env?.DASHBOARD_TOKEN || bearer !== env.DASHBOARD_TOKEN) return new Response("not found", { status: 404 });
+  let body = null;
+  try { body = JSON.parse((await request.text()).slice(0, 1000)); } catch {}
+  const ref = String(body?.ref || "");
+  if (!/^q[0-9a-f]{8}$/.test(ref)) return Response.json({ ok: false, error: "bad ref" }, { status: 400 });
+  await ensureTable(env);
+  const r = await env.BILLING.prepare("UPDATE service_requests SET status = 'approved' WHERE ref = ?").bind(ref).run();
+  if ((r.meta?.changes ?? 0) === 0) return Response.json({ ok: false, error: "unknown ref" }, { status: 404 });
+  return Response.json({ ok: true, ref, status: "approved" });
+}
+
 // GET /api/qualify/list: the operator's view, bearer DASHBOARD_TOKEN. Never public.
 export async function listQualify(request, env) {
   const bearer = /^Bearer\s+(.+)$/i.exec(request.headers.get("authorization") || "")?.[1]?.trim();

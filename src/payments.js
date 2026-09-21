@@ -108,7 +108,19 @@ export async function createCheckout(request, env) {
   // confirms the Stripe event before work starts. The link is only ever sent after fit and scope
   // are agreed in writing; the page never offers it cold.
   if (String(packId) === SERVICE.id) {
+    // Fit and scope come first, and the owner's approval of an intake is the gate. Without an
+    // approved reference there is no session, so an unattended page can never sell four hours
+    // of his time. Approval is set through /api/qualify/approve with the operator token, by him.
     const ref = /^q[0-9a-f]{8}$/.test(String(qualifyRef || "")) ? String(qualifyRef) : "";
+    if (!ref || !env?.BILLING) return json({ error: "not_approved", detail: "Checkout opens after fit is confirmed in writing. Start at /qualify." }, 403);
+    let approved = null;
+    try {
+      approved = await env.BILLING.prepare("SELECT ref, email FROM service_requests WHERE ref = ? AND status = 'approved'").bind(ref).first();
+    } catch (err) {
+      console.error("approval lookup failed", err);
+      return json({ error: "checkout unavailable" }, 503);
+    }
+    if (!approved) return json({ error: "not_approved", detail: "Checkout opens after fit is confirmed in writing. Start at /qualify." }, 403);
     let session;
     try {
       session = await stripe(env, "checkout/sessions", {
