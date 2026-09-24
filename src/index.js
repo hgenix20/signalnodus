@@ -11,6 +11,7 @@ import { GLOBE_JS } from "./globe.js";
 import { homePage2, reviewPage2, watchPage2, trustPage2 } from "./pages2.js";
 import { SITE2_JS, SHELL_CSS } from "./shell2.js";
 import { privacyPage3, termsPage3, gatePage3 } from "./pages3.js";
+import { logCheckPage, LOGCHECK_CSS, LOGCHECK_JS } from "./logcheck.js";
 import { FONTS_CSS } from "./fonts.js";
 import { SENTINELS, COAST } from "./watchdata.js";
 import { handleMcp, toolLatestFilings } from "./mcp.js";
@@ -286,7 +287,7 @@ async function apexResponse(request, url, env, ctx) {
   }
   if (url.pathname === "/sitemap.xml") {
     const today = new Date().toISOString().slice(0, 10);
-    const urls = ["/", "/review", "/gate", "/watch", "/swarms", "/agents-index", "/canary", "/trust", "/status", "/privacy", "/terms"].map((u) => `  <url><loc>https://signalnodus.ai${u}</loc><lastmod>${today}</lastmod></url>`).join("\n");
+    const urls = ["/", "/review", "/gate", "/watch", "/swarms", "/agents-index", "/canary", "/log-checker", "/trust", "/status", "/privacy", "/terms"].map((u) => `  <url><loc>https://signalnodus.ai${u}</loc><lastmod>${today}</lastmod></url>`).join("\n");
     return asset(`<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`, "application/xml");
   }
   if (url.pathname === "/robots.txt") {
@@ -323,6 +324,9 @@ async function apexResponse(request, url, env, ctx) {
   if (url.pathname === "/service") { logPageView(env, ctx, request, url); return html(servicePage()); }
   if (url.pathname === "/service/thanks") { logPageView(env, ctx, request, url); return html(thanksPage()); }
   if (url.pathname === "/qualify") { logPageView(env, ctx, request, url); return html(qualifyPage()); }
+  if (url.pathname === "/log-checker") { logPageView(env, ctx, request, url); return html(logCheckPage()); }
+  if (url.pathname === "/log-checker.css") return new Response(LOGCHECK_CSS, { headers: { "content-type": "text/css; charset=utf-8", "cache-control": "no-cache", ...SECURITY_HEADERS } });
+  if (url.pathname === "/log-checker.js") return new Response(LOGCHECK_JS, { headers: { "content-type": "application/javascript; charset=utf-8", "cache-control": "no-cache", ...SECURITY_HEADERS } });
   if (url.pathname === "/api/qualify") return handleQualify(request, env);
   if (url.pathname === "/api/qualify/list") return listQualify(request, env);
   if (url.pathname === "/api/qualify/approve") return approveQualify(request, env);
