@@ -1,6 +1,6 @@
 // The crawler-control service: the one offer the front page leads with from 2026-09-21.
 //
-// A fixed-price job for owner-operated publishers on Cloudflare. Eligibility comes before
+// A fixed-price job for owner-operated small technical sites on any host. Eligibility comes before
 // payment: /qualify collects an intake form into D1 (service_requests), the operator confirms
 // fit and scope, and only then does a Stripe Checkout link go out (the `crawler-service` item
 // in payments.js). Nothing here takes money on its own and a success-page visit never counts
@@ -12,7 +12,7 @@ export const SERVICE = {
   cents: 35_000,
   label: "Crawler-control service",
   description:
-    "One site on Cloudflare, up to four hours of configuration work, delivered within 14 calendar days after agreed access. No subscription.",
+    "One site on any host, up to four hours of configuration work, delivered within 14 calendar days after agreed access. No subscription.",
 };
 
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -24,19 +24,19 @@ export function offerSection({ heading = "h1" } = {}) {
   const H = heading;
   return `
   <section class="chapter bt0" id="offer" tabindex="-1"><div class="wrap">
-    <div class="stack"><span class="eyebrow">For independent publishers on Cloudflare</span>
+    <div class="stack"><span class="eyebrow">For small sites on any host</span>
       <${H}>Get your crawler controls checked, and configured.</${H}>
-      <p class="lede mw44">A fixed-price service for independent publishers using Cloudflare. We review the request evidence your setup makes available, agree which automated traffic you want to allow or restrict, and implement a small set of approved changes. You get practical configuration help, not another monitoring subscription.</p>
+      <p class="lede mw44">A fixed-price service for owners of small technical sites on any host. We review the request evidence your setup makes available, agree which automated traffic you want to allow or restrict, and implement a small set of approved changes for Cloudflare, nginx, Apache and common managed hosts. You get practical configuration help, not another monitoring subscription.</p>
       <p class="dim mw44">An AI assistant helps with intake and preparation; a human solutions architect approves and performs the configuration work.</p>
     </div>
     <div class="offer-grid">
       <div class="item"><h3>Evidence review</h3><p class="dim">A concise account of observed crawler activity, including what cannot be reliably identified.</p></div>
-      <div class="item"><h3>Approved changes</h3><p class="dim">Supported Cloudflare settings adjusted to your publishing priorities, with a change log and rollback instructions.</p></div>
+      <div class="item"><h3>Approved changes</h3><p class="dim">Supported settings for Cloudflare, nginx, Apache and common managed hosts adjusted to your publishing priorities, with a change log and rollback instructions.</p></div>
       <div class="item"><h3>Follow-up check</h3><p class="dim">Tests of the agreed controls and your key legitimate visitor paths, with remaining limitations documented.</p></div>
     </div>
     <div class="offer-terms">
       <p><strong>$350 once.</strong> One site, up to four hours of work, delivered within 14 calendar days after agreed access is available. No subscription. Full refund if we cannot complete the written, agreed scope; completed work does not guarantee elimination of scraping.</p>
-      <p class="dim"><strong>Eligibility:</strong> you control a publisher website on Cloudflare and can provide suitable evidence and narrowly scoped access. We confirm fit before payment.</p>
+      <p class="dim"><strong>Eligibility:</strong> you control a small technical site on Cloudflare, nginx, Apache or a common managed host, and can provide suitable evidence and narrowly scoped access. We confirm fit before payment.</p>
       <p class="dim"><strong>Not:</strong> comprehensive agent identification, legal evidence, emergency incident response, or a promise to stop every scraper.</p>
       <p class="row"><a class="cta" href="/qualify">Check whether your site qualifies</a><a class="cta ghost" href="/canary">Try the free canary first</a></p>
     </div>
@@ -50,13 +50,13 @@ export function servicePage() {
     <ol class="steps">
       <li><h3>You tell us what happened</h3><p class="dim">The form asks eight questions: what prompted this, what must keep working, what evidence you have. Thirty minutes of our time to confirm fit, free.</p></li>
       <li><h3>Scope in writing, then checkout</h3><p class="dim">A specific written scope, a start date and the 14-day window before any payment. Stripe checkout, one-off, receipt by email.</p></li>
-      <li><h3>Least-privilege access</h3><p class="dim">You make the changes on a call from our instructions, or grant a temporary, narrowly scoped Cloudflare invitation. Never a password. Access is revoked at the end.</p></li>
+      <li><h3>Least-privilege access</h3><p class="dim">You make the changes on a call from our instructions, or grant temporary, narrowly scoped access to your stack. Never a password. Access is revoked at the end.</p></li>
       <li><h3>Verify, report, roll back if needed</h3><p class="dim">Agreed tests before and after. A short report that separates what is known from what is not. Rollback instructions stay with you.</p></li>
     </ol>
   </div></section></main>`;
   return shell2("Crawler-control service · Signal Nodus", inner, {
     current: "/service", canonical: "https://signalnodus.ai/service",
-    description: "A $350 fixed-price service for independent publishers on Cloudflare: review the crawler evidence, agree an allow/restrict policy, implement approved settings, check the result.",
+    description: "A $350 fixed-price service for small technical sites on any host: review the crawler evidence, agree an allow/restrict policy, implement approved settings, check the result.",
   }).replace("</head>", '<link rel="stylesheet" href="/service.css">\n</head>');
 }
 
@@ -64,7 +64,7 @@ const FIELDS = [
   ["site", "Your site", "url", "https://example.com", "The publisher site this is about, and confirm you can authorise changes to it."],
   ["prompted", "What happened that you want addressed, and when?", "textarea", "", "The specific thing: a traffic spike, a hosting warning, content showing up somewhere, a bill."],
   ["outcome", "What would a useful outcome look like?", "textarea", "", ""],
-  ["stack", "Hosting stack and Cloudflare plan", "text", "e.g. WordPress on a VPS behind Cloudflare Free", ""],
+  ["stack", "Hosting stack (server, CDN or platform)", "text", "e.g. WordPress on a VPS behind Cloudflare Free, or nginx on a bare VPS", ""],
   ["evidence", "What request logs, analytics or examples do you have?", "textarea", "", "Cloudflare analytics, server logs, a screenshot, a hosting provider's message. Say what exists; do not paste logs here."],
   ["keep", "Which crawlers, AI services, feeds, APIs or partner integrations must keep working?", "textarea", "", ""],
   ["paths", "The three legitimate visitor paths that matter most", "text", "e.g. homepage, subscribe checkout, subscriber login", ""],
