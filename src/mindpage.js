@@ -10,23 +10,23 @@ const CHECKED = "as of September 2026";
 const row = (feature, ...cells) => `<tr><td>${feature}</td>${cells.map((c) => `<td>${c}</td>`).join("")}</tr>`;
 const src = (href) => `<a href="${href}" rel="noopener nofollow">source</a>`;
 
-const MOTION_SRC = "https://www.lindy.ai/blog/motion-app-pricing";
-const LINDY_SRC = "https://coworker.ai/blog/lindy-ai-pricing";
+const MOTION_SRC = "https://www.usemotion.com/pricing";
+const LINDY_SRC = "https://www.lindy.ai/pricing";
 const SUPERHUMAN_SRC = "https://help.superhuman.com/hc/en-us/articles/38456109456147-Pricing-Plans";
 
 const COMPARE_TABLE = `<div class="scroll"><table class="rec">
   <tr><th></th><th>genix mind</th><th>Motion</th><th>Lindy</th><th>Superhuman</th></tr>
   ${row(
     "Price",
-    "$39/mo",
-    `$49/mo, Pro AI solo plan (${src(MOTION_SRC)}, ${CHECKED})`,
-    `$49.99&ndash;$199.99/mo, no free plan (${src(LINDY_SRC)}, ${CHECKED})`,
+    "$39/mo, planned price at launch",
+    `$19/seat/mo, Pro AI individual plan (${src(MOTION_SRC)}, ${CHECKED})`,
+    `$29.99&ndash;$199.99/mo per user (Plus/Pro/Max), no free plan (${src(LINDY_SRC)}, ${CHECKED})`,
     `$30/mo Starter, $40/mo Business (${src(SUPERHUMAN_SRC)}, ${CHECKED})`,
   )}
   ${row(
     "What that price covers",
-    "The assistant only. It runs on the ChatGPT Plus or Claude Pro plan you sign in with yourself, so most people already pay the other roughly $20/mo",
-    `Its own AI is part of the $49 (${src(MOTION_SRC)})`,
+    "The assistant only. It is planned to run on the ChatGPT Plus or Claude Pro plan you sign in with yourself, so most people already pay the other roughly $20/mo",
+    `Its own AI is part of the $19 (${src(MOTION_SRC)})`,
     `Model use is metered by credits inside the price (${src(LINDY_SRC)})`,
     `Its own AI features are part of the price (${src(SUPERHUMAN_SRC)})`,
   )}
@@ -39,7 +39,7 @@ const COMPARE_TABLE = `<div class="scroll"><table class="rec">
   )}
   ${row(
     "Free way to start",
-    "Yes, self-hosted, run it yourself, $0",
+    "Planned: a free self-hosted version. Not available yet, no public repo",
     "&mdash;",
     "&mdash;",
     "&mdash;",
@@ -84,8 +84,8 @@ export function mindPage() {
   </div></section>
 
   <section class="chapter" id="price" tabindex="-1"><div class="wrap">
-    <div class="stack"><span class="eyebrow">price</span><h2>$39 a month, on top of the plan you already have.</h2>
-      <p class="dim mw44">Most people in this audience already pay around $20/mo for ChatGPT Plus or Claude Pro. genix mind is $39/mo on top of that, hosted for you. A free, self-hosted version exists for anyone willing to run it themselves; it costs nothing but your own time to set up.</p>
+    <div class="stack"><span class="eyebrow">price, planned at launch</span><h2>$39 a month is the planned price at launch, on top of the plan you already have.</h2>
+      <p class="dim mw44">Most people in this audience already pay around $20/mo for ChatGPT Plus or Claude Pro. genix mind is planned at $39/mo on top of that, hosted for you. A free, self-hosted version is also planned, for anyone willing to run it themselves once it exists; it does not exist yet and there is no public repo today. Nothing on this page is available for purchase or download now; the waitlist is the only thing you can actually do here.</p>
     </div>
   </div></section>
 
