@@ -11,6 +11,7 @@ import { GLOBE_JS } from "./globe.js";
 import { homePage2, reviewPage2, watchPage2, trustPage2 } from "./pages2.js";
 import { SITE2_JS, SHELL_CSS } from "./shell2.js";
 import { privacyPage3, termsPage3, gatePage3 } from "./pages3.js";
+import { mindPage, MIND_JS } from "./mindpage.js";
 import { logCheckPage, LOGCHECK_CSS, LOGCHECK_JS } from "./logcheck.js";
 import { FONTS_CSS } from "./fonts.js";
 import { SENTINELS, COAST } from "./watchdata.js";
@@ -251,6 +252,8 @@ async function apexResponse(request, url, env, ctx) {
   if (url.pathname === "/terms") { logPageView(env, ctx, request, url); return html(termsPage3()); }
   if (url.pathname === "/gate") { logPageView(env, ctx, request, url); return html(gatePage3()); }
   if (url.pathname === "/vs") { logPageView(env, ctx, request, url); return html(vsPage()); }
+  if (url.pathname === "/mind") { logPageView(env, ctx, request, url); return html(mindPage()); }
+  if (url.pathname === "/mind.js") return new Response(MIND_JS, { headers: { "content-type": "application/javascript; charset=utf-8", "cache-control": "no-cache", ...SECURITY_HEADERS } });
   if (url.pathname === "/compliance") { logPageView(env, ctx, request, url); return html(compliancePage()); }
   if (url.pathname === "/eval") { logPageView(env, ctx, request, url); return html(evalPage()); }
   if (url.pathname === "/eval.json") return json(EVAL_RESULTS);
@@ -287,7 +290,7 @@ async function apexResponse(request, url, env, ctx) {
   }
   if (url.pathname === "/sitemap.xml") {
     const today = new Date().toISOString().slice(0, 10);
-    const urls = ["/", "/review", "/gate", "/watch", "/swarms", "/agents-index", "/canary", "/log-checker", "/trust", "/status", "/privacy", "/terms"].map((u) => `  <url><loc>https://signalnodus.ai${u}</loc><lastmod>${today}</lastmod></url>`).join("\n");
+    const urls = ["/", "/review", "/gate", "/watch", "/swarms", "/mind", "/agents-index", "/canary", "/log-checker", "/trust", "/status", "/privacy", "/terms"].map((u) => `  <url><loc>https://signalnodus.ai${u}</loc><lastmod>${today}</lastmod></url>`).join("\n");
     return asset(`<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`, "application/xml");
   }
   if (url.pathname === "/robots.txt") {

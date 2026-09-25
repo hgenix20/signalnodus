@@ -1,14 +1,31 @@
-// Early access for the canary kit: an email box on /swarms.
+// Early access, shared by two waitlists: the canary kit on /swarms and genix mind on /mind. One
+// table, one `what` column names which list a row belongs to.
 //
-// The site's CSP has form-action 'none', so the form posts with fetch from /swarm-map.js. Guards: same
-// origin, a honeypot field people never see, at least three seconds between page load and submit, a
-// plain email check, and five sign-ups per visitor per day (a daily-salted hash, no IP stored). Answers
-// the same way whether a sign-up was kept or dropped, so the guards cannot be probed.
+// The site's CSP has form-action 'none', so each form posts with fetch from its own page script.
+// Guards: same origin, a honeypot field people never see, at least three seconds between page load
+// and submit, a plain email check, and five sign-ups per visitor per day across both lists (a
+// daily-salted hash, no IP stored). Answers the same way whether a sign-up was kept or dropped, so
+// the guards cannot be probed.
 // The mind's box reads new sign-ups from /dashboard/waitlist.json with the dashboard token.
 
 const EMAIL = /^[^\s@<>"',;]{1,64}@[a-z0-9.-]{1,190}\.[a-z]{2,24}$/i;
 const PER_DAY = 5;
 const USES = new Set(["evidence", "control", "injection", "security", "curious", "other"]);
+const WHATS = new Set(["canary-kit", "genix-mind"]);
+const MESSAGES = {
+  "canary-kit": "You're on the list. We'll write when the canary kit is ready for your site.",
+  "genix-mind": "You're on the waitlist. We'll write when genix mind is ready to try. This is not a purchase; nothing is charged.",
+};
+
+// Pure, testable: which list a sign-up belongs to, defaulting to the older canary-kit list.
+export function resolveWhat(what) {
+  return WHATS.has(what) ? what : "canary-kit";
+}
+
+// Pure, testable: the reply shown for that list.
+export function messageFor(what) {
+  return MESSAGES[resolveWhat(what)];
+}
 
 let ready = false;
 async function ensureTable(env) {
@@ -42,8 +59,9 @@ export async function handleEarlyAccess(request, env, ctx) {
   let body = null;
   try { body = JSON.parse((await request.text()).slice(0, 2048)); } catch {}
   const problem = signupProblem(body, request.headers.get("origin"), request.headers.get("sec-fetch-site"));
+  const what = resolveWhat(body?.what);
   if (problem === "email") return Response.json({ ok: false, error: "That doesn't look like an email address." }, { status: 400 });
-  const ok = Response.json({ ok: true, message: "You're on the list. We'll write when the canary kit is ready for your site." });
+  const ok = Response.json({ ok: true, message: messageFor(what) });
   if (problem || !env?.BILLING) return ok;
   const now = new Date();
   const day = now.toISOString().slice(0, 10);
@@ -53,7 +71,7 @@ export async function handleEarlyAccess(request, env, ctx) {
     const n = await env.BILLING.prepare("SELECT COUNT(*) AS n FROM waitlist WHERE day = ? AND vid = ?").bind(day, vid).first();
     if ((n?.n || 0) >= PER_DAY) return;
     await env.BILLING.prepare("INSERT OR IGNORE INTO waitlist (ts, day, email, what, source, vid, use) VALUES (?, ?, ?, ?, ?, ?, ?)")
-      .bind(now.toISOString(), day, clip(body.email, 254).toLowerCase(), "canary-kit", clip(body.source, 80) || null, vid, USES.has(body.use) ? body.use : null).run();
+      .bind(now.toISOString(), day, clip(body.email, 254).toLowerCase(), what, clip(body.source, 80) || null, vid, USES.has(body.use) ? body.use : null).run();
   })().catch(() => {});
   if (ctx?.waitUntil) ctx.waitUntil(work); else await work;
   return ok;

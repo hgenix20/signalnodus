@@ -109,6 +109,13 @@ footer { border-top-color: var(--line); color: var(--dim); font: 400 13px var(--
 .steps li { counter-increment: st; border: 1px solid var(--line); border-radius: 16px; padding: 22px; background: var(--panel); }
 .steps li::before { content: counter(st); display: inline-grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; background: var(--muted); color: var(--canary); font: 700 15px var(--body); margin-bottom: 12px; }
 .proof .item { border-color: var(--line); background: var(--panel); border-radius: 14px; }
+/* Waitlist form (/mind), shared look with the rest of the shell. */
+.waitlist-form { margin-top: 18px; }
+.waitlist-form label { display: block; font-size: .9em; color: var(--dim); margin-bottom: 8px; }
+.waitlist-form input[type=email] { flex: 1 1 220px; min-width: 0; min-height: 44px; padding: 0 14px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); color: var(--fg); font: 400 16px var(--body); }
+.waitlist-form input[type=email]:focus-visible { outline: 2px solid var(--canary); outline-offset: 2px; }
+.waitlist-form .hp { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
+.waitlist-msg { margin-top: 10px; }
 `;
 export function shell2(title, inner, opts = {}) {
   const { canonical = "https://signalnodus.ai/", description = "", current = "/", index = true, rail = null } = opts;
