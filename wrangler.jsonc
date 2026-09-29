@@ -1,7 +1,8 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "signalnodus",
-  "main": "src/index.js",
+  // Retired 2026-09-29: every request gets the closed notice. The product lives on in src/index.js.
+  "main": "src/retired.js",
   "compatibility_date": "2026-07-01",
   // mppx and the Stripe SDK reach for node builtins.
   "compatibility_flags": ["nodejs_compat"],
@@ -51,6 +52,6 @@
   // abuse channel; do not read this as a sub-second guard.
   "limits": { "cpu_ms": 30000 },
   // Daily housekeeping: clear checkout rows nobody completed.
-  "triggers": { "crons": ["17 4 * * *"] },
+  "triggers": { "crons": [] },
   "observability": { "enabled": true }
 }
